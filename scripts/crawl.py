@@ -1,6 +1,7 @@
 import logging
 import sys
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 from app.config import settings
 from app.database import init_db
@@ -10,6 +11,7 @@ from crawler.crawler import Crawler
 def setup_logging():
     log_dir = settings.LOG_DIR
     log_file = f"{log_dir}/crawl.log"
+    Path(log_dir).mkdir(parents=True, exist_ok=True)
 
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)

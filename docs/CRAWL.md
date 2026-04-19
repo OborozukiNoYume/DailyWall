@@ -102,4 +102,21 @@ https://www.bing.com/HPImageArchive.aspx?format=js&uhd=1&idx={offset}&n={count}&
 uv run python scripts/crawl.py
 ```
 
-脚本会自动初始化数据库和目录，无需额外操作。
+脚本会自动初始化数据库，并创建运行所需目录：
+
+- `data/`
+- `wallpaper/`
+- `logs/`
+
+如需通过代理抓取，在执行前确保 `.env` 中已设置 `PROXY_URL`，例如：
+
+```env
+PROXY_URL=http://127.0.0.1:7890
+```
+
+手动采集完成后，可启动 API 并检查运行状态：
+
+```bash
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+curl http://127.0.0.1:8000/api/health
+```

@@ -19,14 +19,20 @@ Bing 多国壁纸本地归档 API 服务。
 # 安装依赖
 uv sync --dev
 
-# （可选）配置环境变量
+# 配置环境变量
 cp .env.example .env
+
+# 按需设置代理，位于中国大陆或需要访问国际 Bing 市场时建议填写
+# PROXY_URL=http://127.0.0.1:7890
+
+# 首次采集（拉取最近 8 天壁纸，自动初始化数据库和运行目录）
+uv run python scripts/crawl.py
 
 # 启动 API 服务
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 
-# 首次采集（拉取最近 8 天壁纸，自动初始化数据库）
-uv run python scripts/crawl.py
+# 健康检查
+curl http://127.0.0.1:8000/api/health
 ```
 
 API 文档：`http://localhost:8000/redoc`

@@ -39,6 +39,12 @@ cp .env.example .env
 | `API_HOST` | `0.0.0.0` | API 监听地址 |
 | `API_PORT` | `8000` | API 监听端口 |
 
+如果部署环境位于中国大陆，或需要稳定访问国际 Bing 市场，建议在 `.env` 中设置代理，例如：
+
+```env
+PROXY_URL=http://127.0.0.1:7890
+```
+
 ### 4. 启动 API 服务
 
 ```bash
@@ -62,6 +68,20 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```bash
 uv run python scripts/crawl.py
 ```
+
+脚本会自动创建运行所需目录，无需手动创建 `data/`、`wallpaper/` 或 `logs/`。
+
+推荐顺序：
+
+```bash
+uv sync --dev
+cp .env.example .env
+uv run python scripts/crawl.py
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+curl http://127.0.0.1:8000/api/health
+```
+
+健康检查返回 `status=healthy` 且 `db_ok=true` 时，表示 API 已正常连接本地数据库。
 
 ### 6. 配置定时采集
 

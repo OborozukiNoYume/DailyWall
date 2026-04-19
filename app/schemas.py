@@ -8,13 +8,14 @@ class WallpaperQueryParams(BaseModel):
     year: Optional[int] = None
     month: Optional[int] = None
     keyword: Optional[str] = Field(default=None, min_length=2)
+    dedup: bool = False
     page: int = Field(default=1, ge=1)
     size: int = Field(default=20, ge=1, le=100)
 
 
 class WallpaperItem(BaseModel):
     id: str
-    mkt: str
+    mkt: str | list[str]
     date: str
     title: Optional[str] = None
     copyright: Optional[str] = None

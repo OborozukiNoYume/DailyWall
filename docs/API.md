@@ -46,8 +46,18 @@ curl "http://localhost:8000/api/filters"
 | `year` | integer | 否 | 年份筛选 |
 | `month` | integer | 否 | 月份筛选 |
 | `keyword` | string | 否 | 关键词检索（最少 2 字符），需搭配 mkt/year/month 之一 |
+| `dedup` | boolean | 否 | 是否按 `resources.sha256` 去重，默认 `false` |
 | `page` | integer | 否 | 页码，默认 1，≥1 |
 | `size` | integer | 否 | 每页条数，默认 20，范围 1-100 |
+
+### `dedup=true` 行为说明
+
+- 按 `resources.sha256` 聚合同一张图片
+- `title` / `copyright` 按地区优先级选择：`zh-CN` > `en-US` > 其他
+- `mkt` 字段改为数组，返回该图出现过的所有地区
+- `date` 字段为该图最早发布日期
+- `keyword` 命中任意一条关联 metadata 即返回该图
+- `total`、`pages` 和分页结果都基于去重后的资源数量计算
 
 ### 响应示例
 
@@ -77,6 +87,34 @@ curl "http://localhost:8000/api/filters"
 }
 ```
 
+`dedup=true` 响应示例：
+
+```json
+{
+  "items": [
+    {
+      "id": "08b00319b4bf4b145022467b2f5b0cccf2732adfd063621517932e5308e5478e",
+      "mkt": ["zh-CN", "en-US", "ja-JP"],
+      "date": "2026-04-16",
+      "title": "蝙蝠信号：开启",
+      "copyright": "灰头狐蝠母亲携幼崽，雅拉湾国家公园，澳大利亚 (© Doug Gimesy/Nature Picture Library)",
+      "width": 3840,
+      "height": 2160,
+      "bytes": 3522378,
+      "ext": "jpg",
+      "mime_type": "image/jpeg",
+      "thumbnail_url": "/api/images/08b003...e5478e?size=thumbnail",
+      "preview_url": "/api/images/08b003...e5478e?size=preview",
+      "download_url": "/api/images/08b003...e5478e/download"
+    }
+  ],
+  "total": 17,
+  "page": 1,
+  "size": 20,
+  "pages": 1
+}
+```
+
 ### 错误码
 
 | 状态码 | 说明 |
@@ -94,6 +132,9 @@ curl "http://localhost:8000/api/wallpapers?mkt=zh-CN&keyword=蝙蝠"
 
 # 分页
 curl "http://localhost:8000/api/wallpapers?page=2&size=10"
+
+# 去重浏览
+curl "http://localhost:8000/api/wallpapers?dedup=true"
 
 # 不带筛选条件，返回全部
 curl "http://localhost:8000/api/wallpapers"

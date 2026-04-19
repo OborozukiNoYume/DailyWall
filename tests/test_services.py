@@ -5,27 +5,40 @@ from app.schemas import WallpaperQueryParams
 from app.services import wallpaper_service, filter_service, health_service
 
 
-def _insert_wallpaper(session, suffix, mkt="zh-CN", year=2026, month=4):
-    sha = f"{'a' * 60}{suffix:04d}"
-    resource = Resource(
-        sha256=sha,
-        year=year,
-        month=month,
-        base_path=f"wallpaper/{year}/{month:02d}/{sha}",
-        ext="jpg",
-        mime_type="image/jpeg",
-        width=1920,
-        height=1080,
-        bytes=1000000,
-    )
-    session.add(resource)
+def _insert_wallpaper(
+    session,
+    suffix,
+    mkt="zh-CN",
+    year=2026,
+    month=4,
+    sha=None,
+    date=None,
+    title=None,
+    copyright=None,
+):
+    sha = sha or f"{'a' * 60}{suffix:04d}"
+    resource = session.get(Resource, sha)
+    if resource is None:
+        resource = Resource(
+            sha256=sha,
+            year=year,
+            month=month,
+            base_path=f"wallpaper/{year}/{month:02d}/{sha}",
+            ext="jpg",
+            mime_type="image/jpeg",
+            width=1920,
+            height=1080,
+            bytes=1000000,
+        )
+        session.add(resource)
+
     meta = Metadata(
         mkt=mkt,
-        date=f"{year}-{month:02d}-{suffix:02d}",
+        date=date or f"{year}-{month:02d}-{suffix:02d}",
         sha256=sha,
         hsh=f"hsh_{suffix}",
-        title=f"Title {suffix}",
-        copyright=f"Copyright {suffix}",
+        title=title or f"Title {suffix}",
+        copyright=copyright or f"Copyright {suffix}",
     )
     session.add(meta)
     session.commit()
@@ -94,6 +107,91 @@ def test_soft_delete_excluded(db_session):
     params = WallpaperQueryParams()
     result = wallpaper_service.list_wallpapers(db_session, params)
     assert result.total == 0
+
+
+def test_dedup_groups_by_sha_and_uses_priority_metadata(db_session):
+    sha = "c" * 64
+    _insert_wallpaper(
+        db_session,
+        1,
+        mkt="en-US",
+        sha=sha,
+        date="2026-04-19",
+        title="English Title",
+        copyright="English Copyright",
+    )
+    _insert_wallpaper(
+        db_session,
+        2,
+        mkt="zh-CN",
+        sha=sha,
+        date="2026-04-18",
+        title="中文标题",
+        copyright="中文版权",
+    )
+
+    params = WallpaperQueryParams(dedup=True)
+    result = wallpaper_service.list_wallpapers(db_session, params)
+
+    assert result.total == 1
+    assert len(result.items) == 1
+    assert result.items[0].mkt == ["zh-CN", "en-US"]
+    assert result.items[0].date == "2026-04-18"
+    assert result.items[0].title == "中文标题"
+    assert result.items[0].copyright == "中文版权"
+
+
+def test_dedup_keyword_matches_any_metadata(db_session):
+    sha = "d" * 64
+    _insert_wallpaper(
+        db_session,
+        1,
+        mkt="zh-CN",
+        sha=sha,
+        date="2026-04-18",
+        title="普通标题",
+    )
+    _insert_wallpaper(
+        db_session,
+        2,
+        mkt="en-US",
+        sha=sha,
+        date="2026-04-19",
+        title="Aurora Over Lake",
+    )
+
+    params = WallpaperQueryParams(year=2026, keyword="Aurora", dedup=True)
+    result = wallpaper_service.list_wallpapers(db_session, params)
+
+    assert result.total == 1
+    assert result.items[0].id == sha
+    assert result.items[0].mkt == ["zh-CN", "en-US"]
+
+
+def test_dedup_mkt_filter_returns_all_markets_for_matched_image(db_session):
+    sha = "e" * 64
+    _insert_wallpaper(db_session, 1, mkt="zh-CN", sha=sha, date="2026-04-18")
+    _insert_wallpaper(db_session, 2, mkt="en-US", sha=sha, date="2026-04-19")
+
+    params = WallpaperQueryParams(mkt="zh-CN", dedup=True)
+    result = wallpaper_service.list_wallpapers(db_session, params)
+
+    assert result.total == 1
+    assert result.items[0].mkt == ["zh-CN", "en-US"]
+
+
+def test_dedup_pagination_counts_unique_resources(db_session):
+    shared_sha = "f" * 64
+    _insert_wallpaper(db_session, 1, mkt="zh-CN", sha=shared_sha)
+    _insert_wallpaper(db_session, 2, mkt="en-US", sha=shared_sha)
+    _insert_wallpaper(db_session, 3, mkt="ja-JP")
+
+    params = WallpaperQueryParams(dedup=True, page=1, size=1)
+    result = wallpaper_service.list_wallpapers(db_session, params)
+
+    assert result.total == 2
+    assert result.pages == 2
+    assert len(result.items) == 1
 
 
 def test_filter_options(db_session):

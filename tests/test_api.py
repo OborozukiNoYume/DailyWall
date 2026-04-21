@@ -49,6 +49,11 @@ def test_wallpapers_empty(api_client):
     assert data["total"] == 0
 
 
+def test_random_wallpaper_empty(api_client):
+    resp = api_client.get("/api/wallpapers/random")
+    assert resp.status_code == 404
+
+
 def test_wallpapers_keyword_alone_400(api_client):
     resp = api_client.get("/api/wallpapers?keyword=test")
     assert resp.status_code == 400
@@ -71,6 +76,15 @@ def test_wallpapers_with_data(api_client, db_session):
     data = resp.json()
     assert data["total"] == 1
     assert data["items"][0]["id"] == "b" * 64
+
+
+def test_random_wallpaper_with_data(api_client, db_session):
+    _seed(api_client, db_session)
+    resp = api_client.get("/api/wallpapers/random")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["id"] == "b" * 64
+    assert data["image_url"] == f"/api/images/{'b' * 64}?size=preview"
 
 
 def test_filters_with_data(api_client, db_session):

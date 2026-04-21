@@ -209,7 +209,37 @@ curl -O "http://localhost:8000/api/images/08b003...e5478e/download"
 
 ---
 
-## 5. 健康检测
+## 5. 随机壁纸
+
+`GET /api/wallpapers/random`
+
+返回一张随机壁纸的可直接引用图片 URL，适合前端页面初始化时调用一次并直接用于 `<img src>`。
+`image_url` 为站内相对路径，前端可直接作为同源地址使用，或按部署域名拼成完整 URL。
+
+### 响应示例
+
+```json
+{
+  "id": "08b00319b4bf4b145022467b2f5b0cccf2732adfd063621517932e5308e5478e",
+  "image_url": "/api/images/08b00319b4bf4b145022467b2f5b0cccf2732adfd063621517932e5308e5478e?size=preview"
+}
+```
+
+### 错误码
+
+| 状态码 | 说明 |
+|--------|------|
+| 404 | 当前没有可用壁纸 |
+
+### 调用示例
+
+```bash
+curl "http://localhost:8000/api/wallpapers/random"
+```
+
+---
+
+## 6. 健康检测
 
 `GET /api/health`
 

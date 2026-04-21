@@ -1,11 +1,17 @@
 import math
 from collections import defaultdict
 
+from fastapi import HTTPException
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.models import Metadata, Resource
-from app.schemas import WallpaperItem, WallpaperListResponse, WallpaperQueryParams
+from app.schemas import (
+    RandomWallpaperResponse,
+    WallpaperItem,
+    WallpaperListResponse,
+    WallpaperQueryParams,
+)
 
 MARKET_PRIORITY = {"zh-CN": 0, "en-US": 1}
 
@@ -208,3 +214,22 @@ def list_wallpapers(
         return _list_wallpapers_dedup(session, params)
 
     return _list_wallpapers_default(session, params)
+
+
+def get_random_wallpaper(session: Session) -> RandomWallpaperResponse:
+    resource = (
+        session.query(Resource)
+        .join(Metadata, Metadata.sha256 == Resource.sha256)
+        .filter(Metadata.is_deleted == 0, Resource.is_deleted == 0)
+        .distinct()
+        .order_by(func.random())
+        .first()
+    )
+
+    if resource is None:
+        raise HTTPException(status_code=404, detail="No wallpaper found")
+
+    return RandomWallpaperResponse(
+        id=resource.sha256,
+        image_url=f"/api/images/{resource.sha256}?size=preview",
+    )

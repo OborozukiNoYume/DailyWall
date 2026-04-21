@@ -37,6 +37,11 @@ class WallpaperListResponse(BaseModel):
     pages: int
 
 
+class RandomWallpaperResponse(BaseModel):
+    id: str
+    image_url: str
+
+
 class FilterOptions(BaseModel):
     markets: list[str]
     years: list[int]

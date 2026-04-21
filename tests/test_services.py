@@ -194,6 +194,16 @@ def test_dedup_pagination_counts_unique_resources(db_session):
     assert len(result.items) == 1
 
 
+def test_get_random_wallpaper(db_session):
+    sha = "g" * 64
+    _insert_wallpaper(db_session, 1, sha=sha)
+
+    result = wallpaper_service.get_random_wallpaper(db_session)
+
+    assert result.id == sha
+    assert result.image_url == f"/api/images/{sha}?size=preview"
+
+
 def test_filter_options(db_session):
     filter_service._cache.clear()
     _insert_wallpaper(db_session, 1, mkt="zh-CN", year=2026, month=4)

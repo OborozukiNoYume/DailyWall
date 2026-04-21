@@ -50,7 +50,7 @@ DailyWall/
 │   ├── api/
 │   │   ├── router.py        # /api 路由聚合
 │   │   ├── filters.py       # GET /api/filters
-│   │   ├── wallpapers.py    # GET /api/wallpapers
+│   │   ├── wallpapers.py    # GET /api/wallpapers, GET /api/wallpapers/random
 │   │   ├── images.py        # GET /api/images/{id}, GET /api/images/{id}/download
 │   │   └── health.py        # GET /api/health
 │   ├── services/
@@ -85,6 +85,7 @@ DailyWall/
 |------|------|
 | `GET /api/filters` | 获取筛选选项（地区/年份/月份） |
 | `GET /api/wallpapers` | 壁纸分页列表（支持筛选+关键词） |
+| `GET /api/wallpapers/random` | 随机返回一张壁纸的可引用图片 URL |
 | `GET /api/images/{id}?size=thumbnail\|preview` | 图片访问 |
 | `GET /api/images/{id}/download` | 原图下载（UHD 4K） |
 | `GET /api/health` | 服务健康检测 |

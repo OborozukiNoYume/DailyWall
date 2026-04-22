@@ -1,7 +1,9 @@
 from unittest.mock import MagicMock, patch
 
+from app.config import settings
 from app.models import CrawlState, Metadata, Resource
-from crawler.crawler import Crawler
+from crawler.crawler import Crawler, CrawlResult
+from scripts import crawl as crawl_script
 
 
 BING_RESPONSE = [
@@ -94,13 +96,48 @@ def test_level2_dedup(db_session):
         with patch("crawler.crawler.calculate_sha256", return_value=sha):
             with patch("crawler.crawler.tempfile.mkstemp", return_value=(3, "/tmp/test.jpg")):
                 with patch("crawler.crawler.os.fdopen", MagicMock()):
-                    with patch("crawler.crawler.os.unlink"):
-                        with patch("crawler.crawler.httpx.Client", return_value=mock_client):
-                            success, fail = crawler._crawl_market(
-                                db_session, "en-US"
-                            )
+                        with patch("crawler.crawler.os.unlink"):
+                            with patch(
+                                "crawler.crawler.create_http_client",
+                                return_value=mock_client,
+                            ):
+                                success, fail = crawler._crawl_market(
+                                    db_session, "en-US"
+                                )
 
     metas = db_session.query(Metadata).all()
     mkts = {m.mkt for m in metas}
     assert "en-US" in mkts
     assert db_session.query(Resource).count() == 1
+
+
+def test_run_returns_partial_result(db_session, tmp_path):
+    crawler = Crawler.__new__(Crawler)
+    crawler.engine = db_session.get_bind()
+    crawler.lock_path = tmp_path / ".crawl.lock"
+
+    with patch.object(settings, "MARKETS", ["zh-CN", "en-US"]):
+        with patch.object(
+            Crawler, "_crawl_market", side_effect=[(1, 0), (0, 1)]
+        ):
+            result = crawler.run()
+
+    assert result == CrawlResult("partial", 1, 1)
+
+
+def test_script_main_returns_nonzero_for_partial(monkeypatch):
+    monkeypatch.setattr(crawl_script, "setup_logging", lambda: None)
+    monkeypatch.setattr(
+        crawl_script.settings.__class__,
+        "ensure_dirs",
+        lambda self: None,
+    )
+    monkeypatch.setattr(crawl_script, "init_db", lambda: None)
+
+    class DummyCrawler:
+        def run(self):
+            return CrawlResult("partial", 87, 1)
+
+    monkeypatch.setattr(crawl_script, "Crawler", DummyCrawler)
+
+    assert crawl_script.main() == 2

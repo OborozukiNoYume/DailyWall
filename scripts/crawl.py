@@ -38,8 +38,14 @@ def main():
     settings.ensure_dirs()
     init_db()
     crawler = Crawler()
-    crawler.run()
+    result = crawler.run()
+
+    if result.status == "success":
+        return 0
+    if result.status == "partial":
+        return 2
+    return 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

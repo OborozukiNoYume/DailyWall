@@ -2,6 +2,7 @@ import fcntl
 import logging
 import os
 import tempfile
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -17,12 +18,19 @@ from crawler.downloader import download_and_process
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class CrawlResult:
+    status: str
+    success_count: int
+    fail_count: int
+
+
 class Crawler:
     def __init__(self):
         self.engine = get_crawler_engine()
         self.lock_path = Path(settings.DB_PATH).parent / ".crawl.lock"
 
-    def run(self) -> None:
+    def run(self) -> CrawlResult:
         now = datetime.now(timezone.utc)
         now_str = now.isoformat()
         today = now.strftime("%Y-%m-%d")
@@ -32,14 +40,14 @@ class Crawler:
             lock_fd = open(self.lock_path, "w")
         except OSError:
             logger.error("Cannot create lock file: %s", self.lock_path)
-            return
+            return CrawlResult("fail", 0, 1)
 
         try:
             fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except (IOError, OSError):
             logger.warning("Another crawl is already running, skipping")
             lock_fd.close()
-            return
+            return CrawlResult("skipped", 0, 1)
 
         session = Session(self.engine)
         total_success = 0
@@ -84,9 +92,11 @@ class Crawler:
                 total_success,
                 total_fail,
             )
+            return CrawlResult(status, total_success, total_fail)
         except Exception as e:
             session.rollback()
             logger.error("Crawl error: %s", e)
+            return CrawlResult("fail", total_success, max(total_fail, 1))
         finally:
             session.close()
             fcntl.flock(lock_fd, fcntl.LOCK_UN)

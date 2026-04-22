@@ -19,6 +19,7 @@ class WallpaperItem(BaseModel):
     date: str
     title: Optional[str] = None
     copyright: Optional[str] = None
+    copyrightlink: Optional[str] = None
     width: int
     height: int
     bytes: int

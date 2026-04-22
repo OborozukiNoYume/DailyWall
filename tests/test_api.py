@@ -22,6 +22,7 @@ def _seed(api_client, db_session):
         hsh="api_test_hsh",
         title="API Test",
         copyright="API Copyright",
+        copyrightlink="https://www.bing.com/search?q=api-test",
     )
     db_session.add(meta)
     db_session.commit()
@@ -76,6 +77,10 @@ def test_wallpapers_with_data(api_client, db_session):
     data = resp.json()
     assert data["total"] == 1
     assert data["items"][0]["id"] == "b" * 64
+    assert (
+        data["items"][0]["copyrightlink"]
+        == "https://www.bing.com/search?q=api-test"
+    )
 
 
 def test_random_wallpaper_with_data(api_client, db_session):
@@ -118,6 +123,7 @@ def test_wallpapers_dedup_mode(api_client, db_session):
             hsh="api_test_hsh_en",
             title="English Title",
             copyright="English Copyright",
+            copyrightlink="https://www.bing.com/search?q=english",
         )
     )
     db_session.add(
@@ -128,6 +134,7 @@ def test_wallpapers_dedup_mode(api_client, db_session):
             hsh="api_test_hsh_zh",
             title="中文标题",
             copyright="中文版权",
+            copyrightlink="https://www.bing.com/search?q=zh",
         )
     )
     db_session.commit()
@@ -139,3 +146,4 @@ def test_wallpapers_dedup_mode(api_client, db_session):
     assert data["items"][0]["mkt"] == ["zh-CN", "en-US"]
     assert data["items"][0]["title"] == "中文标题"
     assert data["items"][0]["date"] == "2026-04-18"
+    assert data["items"][0]["copyrightlink"] == "https://www.bing.com/search?q=zh"

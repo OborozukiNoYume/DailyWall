@@ -141,6 +141,7 @@ class Crawler:
         hsh = img_data.get("hsh", "")
         title = img_data.get("title", "")
         copyright_info = img_data.get("copyright", "")
+        copyright_link = img_data.get("copyrightlink", "")
 
         # Level 1 dedup: check mkt + date
         existing = (
@@ -149,6 +150,9 @@ class Crawler:
             .first()
         )
         if existing:
+            if not existing.copyrightlink and copyright_link:
+                existing.copyrightlink = copyright_link
+                session.commit()
             logger.debug("Level 1 dedup hit: %s %s", mkt, date)
             return True
 
@@ -185,6 +189,7 @@ class Crawler:
                 hsh=hsh,
                 title=title,
                 copyright=copyright_info,
+                copyrightlink=copyright_link,
             )
             session.add(meta)
             session.commit()
@@ -218,6 +223,7 @@ class Crawler:
             hsh=hsh,
             title=title,
             copyright=copyright_info,
+            copyrightlink=copyright_link,
         )
         session.add(meta)
         session.commit()

@@ -47,6 +47,7 @@ class Metadata(Base):
     hsh = Column(String, nullable=False)
     title = Column(Text, nullable=True)
     copyright = Column(Text, nullable=True)
+    copyrightlink = Column(Text, nullable=True)
     is_deleted = Column(Integer, nullable=False, default=0)
 
     resource = relationship("Resource", back_populates="metadata_entries")

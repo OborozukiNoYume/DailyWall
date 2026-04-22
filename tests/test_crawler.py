@@ -13,6 +13,7 @@ BING_RESPONSE = [
         "hsh": "test_hash_abc",
         "title": "Test Title",
         "copyright": "Test Copyright",
+        "copyrightlink": "https://www.bing.com/search?q=test",
     }
 ]
 
@@ -52,6 +53,9 @@ def test_level1_dedup(db_session):
     assert success >= 1
     assert fail == 0
     assert db_session.query(Resource).count() == 1
+    refreshed = db_session.query(Metadata).filter_by(mkt="en-US").first()
+    assert refreshed is not None
+    assert refreshed.copyrightlink == BING_RESPONSE[0]["copyrightlink"]
 
 
 def test_level2_dedup(db_session):
@@ -109,6 +113,66 @@ def test_level2_dedup(db_session):
     mkts = {m.mkt for m in metas}
     assert "en-US" in mkts
     assert db_session.query(Resource).count() == 1
+    new_meta = db_session.query(Metadata).filter_by(mkt="en-US").first()
+    assert new_meta is not None
+    assert new_meta.copyrightlink == BING_RESPONSE[0]["copyrightlink"]
+
+
+def test_init_db_adds_metadata_copyrightlink_column(monkeypatch, tmp_path):
+    import sqlite3
+
+    from app.database import init_db
+
+    db_path = tmp_path / "dailywall.db"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE resources (
+                sha256 TEXT PRIMARY KEY,
+                year INTEGER NOT NULL,
+                month INTEGER NOT NULL,
+                base_path TEXT NOT NULL,
+                ext TEXT NOT NULL,
+                mime_type TEXT NOT NULL,
+                width INTEGER NOT NULL,
+                height INTEGER NOT NULL,
+                bytes INTEGER NOT NULL,
+                is_deleted INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE metadata (
+                mkt TEXT NOT NULL,
+                date TEXT NOT NULL,
+                sha256 TEXT NOT NULL,
+                hsh TEXT NOT NULL,
+                title TEXT,
+                copyright TEXT,
+                is_deleted INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (mkt, date)
+            )
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    monkeypatch.setattr(settings, "DB_PATH", str(db_path))
+
+    init_db()
+
+    conn = sqlite3.connect(db_path)
+    try:
+        columns = {
+            row[1] for row in conn.execute("PRAGMA table_info(metadata)")
+        }
+    finally:
+        conn.close()
+
+    assert "copyrightlink" in columns
 
 
 def test_run_returns_partial_result(db_session, tmp_path):

@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Generator
 
 from sqlalchemy import event
+from sqlalchemy import text
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -67,7 +68,22 @@ def get_session() -> Generator[Session, None, None]:
         session.close()
 
 
+def _ensure_metadata_columns(engine) -> None:
+    with engine.begin() as conn:
+        columns = {
+            row[1]
+            for row in conn.exec_driver_sql("PRAGMA table_info(metadata)")
+        }
+        if "copyrightlink" not in columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE metadata ADD COLUMN copyrightlink TEXT"
+                )
+            )
+
+
 def init_db():
     engine = get_crawler_engine()
     Base.metadata.create_all(engine)
+    _ensure_metadata_columns(engine)
     engine.dispose()

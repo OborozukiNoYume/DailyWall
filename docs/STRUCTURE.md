@@ -38,6 +38,7 @@ PRAGMA 设置：`journal_mode=WAL`、`busy_timeout=3000`、`foreign_keys=ON`、`
 | `hsh` | TEXT | NOT NULL | Bing 原生去重标识 |
 | `title` | TEXT | | 壁纸标题 |
 | `copyright` | TEXT | | 版权信息 |
+| `copyrightlink` | TEXT | | Bing 版权跳转链接 |
 | `is_deleted` | INTEGER | NOT NULL DEFAULT 0 | 软删除标记 |
 
 **唯一约束**：`UNIQUE(mkt, date)` — 同地区同日期仅一张壁纸。

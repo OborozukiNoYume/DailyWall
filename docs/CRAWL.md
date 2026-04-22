@@ -12,7 +12,7 @@
 
 支持多地区配置，通过 `MARKETS` 环境变量指定（JSON 数组格式），默认：`["zh-CN","en-US","en-GB","en-IN","en-CA","ja-JP","de-DE","fr-FR","it-IT","es-ES","pt-BR"]`。
 
-每个地区独立调用 Bing API，获取该地区专属的标题、版权信息。不同地区在同一天的壁纸可能不同（独立的图片和文案），而非简单翻译。
+每个地区独立调用 Bing API，获取该地区专属的标题、版权信息和版权跳转链接。不同地区在同一天的壁纸可能不同（独立的图片和文案），而非简单翻译。
 
 **注意**：并非所有 Bing 市场都提供本地化标题。经测试，部分市场（如 ar-SA、ko-KR、ru-RU 等）仅返回标题"Info"而无本地化文案，且图片与其他"Rest of World"市场完全相同，无独特内容。已选定的 11 个市场均经过验证，确保提供完整的本地化标题和版权信息。
 
@@ -20,7 +20,7 @@
 
 - **日常采集**：Cron 每日触发，通过 `scripts/crawl.py` 执行
 - **冷启动**：首次运行自动拉取最近 8 天数据（`idx=0, n=8`）
-- **断点续采**：读取 `crawl_state` 表，从上次成功日期继续
+- **重复执行策略**：当前实现每次都会请求最近 8 天数据，再依靠 `(mkt, date)` 和 `SHA256` 双重去重避免重复入库；`crawl_state` 当前仅用于记录状态，不参与断点续采
 
 ### 采集流程
 
@@ -47,11 +47,26 @@ https://www.bing.com/HPImageArchive.aspx?format=js&uhd=1&idx={offset}&n={count}&
 | `n` | 获取数量（最大 8） |
 | `mkt` | 地区编码 |
 
+### 当前使用的响应字段
+
+单条 `images[*]` 响应中，当前采集逻辑会读取以下字段：
+
+| 字段 | 用途 |
+|------|------|
+| `startdate` | 转换为 `metadata.date` |
+| `hsh` | 写入 `metadata.hsh` |
+| `title` | 写入 `metadata.title` |
+| `copyright` | 写入 `metadata.copyright` |
+| `copyrightlink` | 写入 `metadata.copyrightlink` |
+| `urlbase` | 拼接 UHD 原图下载地址 |
+
 ## 双重去重机制
 
 ### 一级去重（元数据级别）
 
 查询 `metadata` 表，检查 `(mkt, date)` 是否已存在。存在则跳过下载，直接返回成功。
+
+如果已存在记录缺少 `copyrightlink`，而本次 Bing 响应提供了该字段，则会补写 `metadata.copyrightlink` 后返回成功。
 
 ### 二级去重（文件级别）
 
@@ -92,6 +107,7 @@ https://www.bing.com/HPImageArchive.aspx?format=js&uhd=1&idx={offset}&n={count}&
 
 整个采集流程设计为幂等的：
 - 一级去重确保同地区同日期不会重复处理
+- 一级去重允许在重复采集时补写缺失的 `copyrightlink`
 - 二级去重确保相同文件不会重复存储
 - `crawl.py` 启动时自动调用 `init_db()`，无需手动建表
 - 允许重复执行，不会产生脏数据

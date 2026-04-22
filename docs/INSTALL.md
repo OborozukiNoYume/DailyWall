@@ -83,18 +83,47 @@ curl http://127.0.0.1:8000/api/health
 
 健康检查返回 `status=healthy` 且 `db_ok=true` 时，表示 API 已正常连接本地数据库。
 
+如果希望使用 `systemd` 常驻管理 API，可安装项目自带单元文件：
+
+```bash
+sudo install -D -m 0644 deploy/systemd/dailywall-api.service /etc/systemd/system/dailywall-api.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now dailywall-api.service
+systemctl status dailywall-api.service --no-pager
+curl http://127.0.0.1:8000/api/health
+```
+
+补充说明：
+
+- `dailywall-api.service` 默认以 `ops` 用户运行，工作目录固定为项目根目录。
+- 启动命令使用项目虚拟环境中的 `python -m app.main`，会读取项目根目录下的 `.env`，并沿用 `API_HOST`、`API_PORT` 等配置。
+- API 日志默认写入 `journald`，可通过 `journalctl -u dailywall-api.service -n 50 --no-pager` 查看。
+- 若 `.venv` 尚未创建或依赖未安装，服务会启动失败；先执行 `uv sync --dev`。
+
 ### 6. 配置定时采集
 
 ```bash
 crontab -e
 ```
 
-添加每日凌晨 2 点采集任务和备份（需替换为实际路径）：
+添加定时采集任务和备份（需替换为实际路径）。下例使用每天本地时间 `00:33` 抓取：
 
 ```cron
-0 2 * * * cd /path/to/DailyWall && .venv/bin/python scripts/crawl.py >> logs/cron.log 2>&1
+33 0 * * * cd /path/to/DailyWall || exit 1; echo "[$(date --iso-8601=seconds)] cron crawl start" >> logs/cron.log 2>&1; .venv/bin/python scripts/crawl.py >> logs/cron.log 2>&1; code=$?; echo "[$(date --iso-8601=seconds)] cron crawl exit=$code" >> logs/cron.log 2>&1; exit $code
 30 2 * * * cd /path/to/DailyWall && .venv/bin/python scripts/backup.py >> logs/backup.log 2>&1
 ```
+
+补充说明：
+
+- `cron` 按机器本地时区执行，不会自动换算北京时间或 UTC。部署后建议先运行 `timedatectl` 或 `date -Iseconds` 确认时区。
+- 该写法会把开始时间、抓取过程和退出码都追加到 `logs/cron.log`。
+- 抓取脚本退出码约定：
+  - `0`：完全成功
+  - `2`：部分成功
+  - `1`：失败或未成功执行
+- 验证定时任务是否成功时，建议同时检查：
+  - 日志中存在 `Crawl finished: status=success ...`
+  - 日志末尾存在 `cron crawl exit=0`
 
 ## 停止服务
 
@@ -107,4 +136,11 @@ crontab -e
 ps aux | grep uvicorn
 # 终止进程
 kill <PID>
+```
+
+如果使用 `systemd` 管理 API：
+
+```bash
+sudo systemctl stop dailywall-api.service
+sudo systemctl disable dailywall-api.service
 ```

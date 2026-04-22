@@ -1,0 +1,12 @@
+[Unit]
+Description=Schedule DailyWall crawl job for 72-hour systemd test
+
+[Timer]
+Unit=dailywall-crawl-test.service
+OnCalendar=*-*-* 00:33:00
+OnCalendar=*-*-* 11:11:00
+Persistent=true
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

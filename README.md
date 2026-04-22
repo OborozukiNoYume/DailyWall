@@ -37,6 +37,24 @@ curl http://127.0.0.1:8000/api/health
 
 API 文档：`http://localhost:8000/redoc`
 
+如果希望由 `systemd` 常驻管理 API：
+
+```bash
+sudo install -D -m 0644 deploy/systemd/dailywall-api.service /etc/systemd/system/dailywall-api.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now dailywall-api.service
+systemctl status dailywall-api.service --no-pager
+curl http://127.0.0.1:8000/api/health
+```
+
+说明：
+
+- API service 文件位于 `deploy/systemd/dailywall-api.service`
+- 默认以 `ops` 用户运行，工作目录为项目根目录
+- 启动命令使用项目虚拟环境中的 `python -m app.main`
+- 运行日志可通过 `journalctl -u dailywall-api.service -n 50 --no-pager` 查看
+- 停止或重启服务可使用 `sudo systemctl stop dailywall-api.service`、`sudo systemctl restart dailywall-api.service`
+
 ## 项目结构
 
 ```
@@ -90,15 +108,60 @@ DailyWall/
 | `GET /api/images/{id}/download` | 原图下载（UHD 4K） |
 | `GET /api/health` | 服务健康检测 |
 
+## API 的 systemd 管理
+
+```bash
+# 启动并设为开机自启
+sudo systemctl enable --now dailywall-api.service
+
+# 查看状态
+systemctl status dailywall-api.service --no-pager
+
+# 查看最近日志
+journalctl -u dailywall-api.service -n 50 --no-pager
+
+# 重启服务
+sudo systemctl restart dailywall-api.service
+
+# 停止服务
+sudo systemctl stop dailywall-api.service
+```
+
+健康检查返回 `status=healthy` 且 `db_ok=true` 时，表示 API 服务和数据库连接正常：
+
+```bash
+curl http://127.0.0.1:8000/api/health
+```
+
 ## 定时采集
 
 ```bash
 crontab -e
-# 每日凌晨 2 点采集
-0 2 * * * cd /path/to/DailyWall && .venv/bin/python scripts/crawl.py >> logs/cron.log 2>&1
+# 示例：每日 00:33 采集（按机器本地时区执行）
+33 0 * * * cd /path/to/DailyWall || exit 1; echo "[$(date --iso-8601=seconds)] cron crawl start" >> logs/cron.log 2>&1; .venv/bin/python scripts/crawl.py >> logs/cron.log 2>&1; code=$?; echo "[$(date --iso-8601=seconds)] cron crawl exit=$code" >> logs/cron.log 2>&1; exit $code
 # 每日采集后备份
 30 2 * * * cd /path/to/DailyWall && .venv/bin/python scripts/backup.py >> logs/backup.log 2>&1
 ```
+
+说明：`cron` 使用机器本地时区；可通过 `timedatectl` 或 `date -Iseconds` 确认当前时区。`logs/cron.log` 中若同时出现 `Crawl finished: status=success ...` 和 `cron crawl exit=0`，可视为该次定时抓取成功。
+
+如果希望使用 `systemd` 管理采集任务，可安装项目自带的测试用单元文件：
+
+```bash
+sudo install -D -m 0644 deploy/systemd/dailywall-crawl-test.service /etc/systemd/system/dailywall-crawl-test.service
+sudo install -D -m 0644 deploy/systemd/dailywall-crawl-test.timer /etc/systemd/system/dailywall-crawl-test.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now dailywall-crawl-test.timer
+systemctl status dailywall-crawl-test.timer --no-pager
+```
+
+说明：
+
+- 相关文件位于 `deploy/systemd/dailywall-crawl-test.service` 和 `deploy/systemd/dailywall-crawl-test.timer`
+- 当前定时计划为每天 `00:33` 和 `11:11`
+- 抓取任务由 `scripts/run_crawl_job.sh` 执行，日志写入 `logs/systemd-crawl.log`
+- 可通过 `journalctl -u dailywall-crawl-test.service -n 50 --no-pager` 查看最近一次执行日志
+- 建议启用 `systemd timer` 前停用同类 `cron` 抓取任务，避免重复执行
 
 ## 文档
 

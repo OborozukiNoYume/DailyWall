@@ -95,9 +95,86 @@ logs/
 └── backup.log         # 备份日志
 ```
 
+### Cron 抓取成功判定
+
+推荐使用带开始标记和退出码的 `crontab` 写法：
+
+```cron
+33 0 * * * cd /path/to/DailyWall || exit 1; echo "[$(date --iso-8601=seconds)] cron crawl start" >> logs/cron.log 2>&1; .venv/bin/python scripts/crawl.py >> logs/cron.log 2>&1; code=$?; echo "[$(date --iso-8601=seconds)] cron crawl exit=$code" >> logs/cron.log 2>&1; exit $code
+```
+
+判断某次定时抓取是否成功时，建议检查 `logs/cron.log` 是否同时满足：
+
+- 出现 `cron crawl start`
+- 出现 `Crawl finished: status=success ...`
+- 出现 `cron crawl exit=0`
+
+退出码含义：
+
+- `0`：完全成功
+- `2`：部分成功
+- `1`：失败、跳过或脚本未成功执行
+
+如果只看到 `cron crawl start`，但没有对应的 `cron crawl exit=...`，通常表示任务异常中断，应继续检查同一时间段内的报错日志。
+
+### systemd 72 小时测试
+
+项目提供了测试用单元文件：
+
+- `deploy/systemd/dailywall-api.service`
+- `deploy/systemd/dailywall-crawl-test.service`
+- `deploy/systemd/dailywall-crawl-test.timer`
+
+配套执行脚本：
+
+- `scripts/run_crawl_job.sh`
+
+默认计划时间：
+
+- 每天 `00:33`
+- 每天 `11:11`
+
+安装并启动示例：
+
+```bash
+sudo install -D -m 0644 deploy/systemd/dailywall-crawl-test.service /etc/systemd/system/dailywall-crawl-test.service
+sudo install -D -m 0644 deploy/systemd/dailywall-crawl-test.timer /etc/systemd/system/dailywall-crawl-test.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now dailywall-crawl-test.timer
+```
+
+建议在启用 `systemd timer` 前停用同类 `cron` 抓取任务，避免重复执行影响测试结论。
+
+测试日志写入：
+
+- `logs/systemd-crawl.log`
+
+状态检查示例：
+
+```bash
+systemctl status dailywall-api.service
+systemctl list-timers dailywall-crawl-test.timer
+systemctl status dailywall-crawl-test.timer
+journalctl -u dailywall-crawl-test.service -n 50 --no-pager
+tail -n 50 logs/systemd-crawl.log
+```
+
 ### API 访问日志
 
-由 uvicorn 自动输出到标准输出/日志。
+如果使用前台方式启动，API 日志由 uvicorn 直接输出到终端。
+
+如果使用 `systemd` 管理 API，推荐命令：
+
+```bash
+sudo install -D -m 0644 deploy/systemd/dailywall-api.service /etc/systemd/system/dailywall-api.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now dailywall-api.service
+systemctl status dailywall-api.service --no-pager
+journalctl -u dailywall-api.service -n 50 --no-pager
+curl http://127.0.0.1:8000/api/health
+```
+
+健康检查返回 `status=healthy` 且 `db_ok=true` 时，可视为 API 服务和数据库连接正常。
 
 ## 软删除与文件清理
 
@@ -134,6 +211,7 @@ WHERE r.is_deleted = 1 AND m.sha256 IS NULL;
 ### 采集失败
 
 - 检查 `crawl_runs` 表最近记录的 `message` 字段
+- 检查 `logs/cron.log` 是否为 `cron crawl exit=2` 或 `cron crawl exit=1`
 - 检查网络连接
 - 检查 `crawl_state` 表 `consecutive_failures` 字段
 - 手动执行 `uv run python scripts/crawl.py` 观察日志输出

@@ -53,3 +53,9 @@
 - **原因**：Bing HPImageArchive.aspx API 根据 IP 地理位置决定响应语言，`mkt` 参数在中国大陆 IP 下被忽略，无论传何值均返回中文内容。同时 Bing 会将 `www.bing.com` 重定向至 `cn.bing.com`。测试确认 `Accept-Language`、`setlang`、`cc` 参数、Cookie、区域域名（`de.bing.com`、`jp.bing.com` 等）均无法绕过此限制
 - **解决**：引入 `PROXY_URL` 配置项，通过国际出口代理访问 Bing API，使 `mkt` 参数生效。爬虫代码统一通过 `create_http_client()` 构建 HTTP 客户端，自动注入代理配置。清空错误 metadata 后重新抓取
 - **教训**：Bing API 的 `mkt` 参数仅在 IP 与请求市场匹配时生效；中国大陆部署时必须配置代理才能获取多语言元数据
+
+### [2026-04-21 15:49] Cron 测试任务中未转义百分号导致任务未执行
+- **现象**：为验证定时任务创建的 `cron_test.log` 在计划时间后仍未生成，测试任务没有写出日志
+- **原因**：我写入 `crontab` 的命令使用了 `printf "[%s] ..."` 和 `date -Iseconds`，其中 `%` 在 Cron 命令中具有特殊含义，未转义时会被当作换行分隔，导致实际执行命令被破坏
+- **解决**：确认任务未成功执行，并记录该错误；后续应改为转义 `%` 或改用不含 `%` 的 shell 形式重建测试任务
+- **教训**：写入 `crontab` 的命令不能直接复用普通 shell 命令模板，必须先检查 `%`、换行和重定向在 Cron 语境下的特殊解析规则

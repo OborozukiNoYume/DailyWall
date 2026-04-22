@@ -1,0 +1,17 @@
+[Unit]
+Description=DailyWall API service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=ops
+Group=ops
+WorkingDirectory=/home/ops/Projects/DailyWall
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/ops/Projects/DailyWall/.venv/bin/python -m app.main
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

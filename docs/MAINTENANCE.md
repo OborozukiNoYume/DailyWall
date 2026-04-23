@@ -174,7 +174,7 @@ journalctl -u dailywall-api.service -n 50 --no-pager
 curl http://127.0.0.1:8000/api/health
 ```
 
-健康检查返回 `status=healthy` 且 `db_ok=true` 时，可视为 API 服务和数据库连接正常。
+健康检查返回 `code=200`、`data.status=healthy` 且 `data.db_ok=true` 时，可视为 API 服务和数据库连接正常。
 
 ## 软删除与文件清理
 

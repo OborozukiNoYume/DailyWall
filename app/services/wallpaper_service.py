@@ -214,10 +214,10 @@ def list_wallpapers(
     session: Session, params: WallpaperQueryParams
 ) -> WallpaperListResponse:
     if params.date and (params.date_from or params.date_to):
-        raise ValueError("date cannot be combined with date_from or date_to")
+        raise ValueError("date 不能与 date_from 或 date_to 同时使用")
 
     if params.date_from and params.date_to and params.date_from > params.date_to:
-        raise ValueError("date_from cannot be later than date_to")
+        raise ValueError("date_from 不能晚于 date_to")
 
     if params.keyword and not any(
         [
@@ -229,9 +229,7 @@ def list_wallpapers(
             params.date_to,
         ]
     ):
-        raise ValueError(
-            "keyword requires at least one of mkt, year, month, date, date_from, date_to"
-        )
+        raise ValueError("keyword 必须搭配 mkt、year、month、date、date_from、date_to 之一")
 
     if params.dedup:
         return _list_wallpapers_dedup(session, params)

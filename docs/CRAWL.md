@@ -136,3 +136,5 @@ PROXY_URL=http://127.0.0.1:7890
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 curl http://127.0.0.1:8000/api/health
 ```
+
+健康检查返回 `code=200`、`data.status=healthy` 且 `data.db_ok=true` 时，表示 API 已成功连接本地数据库。

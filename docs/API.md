@@ -6,6 +6,14 @@ Base URL: `http://localhost:8000`
 - Swagger UI：`http://localhost:8000/docs`（反向代理环境下可能因 iframe 限制无法使用）
 - ReDoc：`http://localhost:8000/redoc`（推荐，无 iframe 依赖）
 
+统一返回说明：
+- JSON 接口统一返回 `{ "code": 状态码, "msg": "说明", "data": ... }`
+- `200` 的 `msg` 固定为 `success`
+- `400` 的 `msg` 固定以 `参数错误：` 开头
+- `404` 的 `msg` 固定为 `未找到数据`
+- `500` 的 `msg` 固定为 `服务器异常`
+- 图片文件接口成功时仍直接返回文件流；仅在出错时返回上述 JSON 结构
+
 ---
 
 ## 1. 获取筛选选项
@@ -18,10 +26,14 @@ Base URL: `http://localhost:8000`
 
 ```json
 {
-  "markets": ["de-DE", "en-CA", "en-GB", "en-IN", "en-US", "es-ES", "fr-FR", "it-IT", "ja-JP", "pt-BR", "zh-CN"],
-  "years": [2026],
-  "year_months": {
-    "2026": [4]
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "markets": ["de-DE", "en-CA", "en-GB", "en-IN", "en-US", "es-ES", "fr-FR", "it-IT", "ja-JP", "pt-BR", "zh-CN"],
+    "years": [2026],
+    "year_months": {
+      "2026": [4]
+    }
   }
 }
 ```
@@ -72,28 +84,32 @@ curl "http://localhost:8000/api/filters"
 
 ```json
 {
-  "items": [
-    {
-      "id": "08b00319b4bf4b145022467b2f5b0cccf2732adfd063621517932e5308e5478e",
-      "mkt": "zh-CN",
-      "date": "2026-04-16",
-      "title": "蝙蝠信号：开启",
-      "copyright": "灰头狐蝠母亲携幼崽，雅拉湾国家公园，澳大利亚 (© Doug Gimesy/Nature Picture Library)",
-      "copyrightlink": "https://www.bing.com/search?q=gray-headed+flying+fox",
-      "width": 3840,
-      "height": 2160,
-      "bytes": 3522378,
-      "ext": "jpg",
-      "mime_type": "image/jpeg",
-      "thumbnail_url": "/api/images/08b003...e5478e?size=thumbnail",
-      "preview_url": "/api/images/08b003...e5478e?size=preview",
-      "download_url": "/api/images/08b003...e5478e/download"
-    }
-  ],
-  "total": 18,
-  "page": 1,
-  "size": 20,
-  "pages": 1
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "items": [
+      {
+        "id": "08b00319b4bf4b145022467b2f5b0cccf2732adfd063621517932e5308e5478e",
+        "mkt": "zh-CN",
+        "date": "2026-04-16",
+        "title": "蝙蝠信号：开启",
+        "copyright": "灰头狐蝠母亲携幼崽，雅拉湾国家公园，澳大利亚 (© Doug Gimesy/Nature Picture Library)",
+        "copyrightlink": "https://www.bing.com/search?q=gray-headed+flying+fox",
+        "width": 3840,
+        "height": 2160,
+        "bytes": 3522378,
+        "ext": "jpg",
+        "mime_type": "image/jpeg",
+        "thumbnail_url": "/api/images/08b003...e5478e?size=thumbnail",
+        "preview_url": "/api/images/08b003...e5478e?size=preview",
+        "download_url": "/api/images/08b003...e5478e/download"
+      }
+    ],
+    "total": 18,
+    "page": 1,
+    "size": 20,
+    "pages": 1
+  }
 }
 ```
 
@@ -101,28 +117,32 @@ curl "http://localhost:8000/api/filters"
 
 ```json
 {
-  "items": [
-    {
-      "id": "08b00319b4bf4b145022467b2f5b0cccf2732adfd063621517932e5308e5478e",
-      "mkt": ["zh-CN", "en-US", "ja-JP"],
-      "date": "2026-04-16",
-      "title": "蝙蝠信号：开启",
-      "copyright": "灰头狐蝠母亲携幼崽，雅拉湾国家公园，澳大利亚 (© Doug Gimesy/Nature Picture Library)",
-      "copyrightlink": "https://www.bing.com/search?q=gray-headed+flying+fox",
-      "width": 3840,
-      "height": 2160,
-      "bytes": 3522378,
-      "ext": "jpg",
-      "mime_type": "image/jpeg",
-      "thumbnail_url": "/api/images/08b003...e5478e?size=thumbnail",
-      "preview_url": "/api/images/08b003...e5478e?size=preview",
-      "download_url": "/api/images/08b003...e5478e/download"
-    }
-  ],
-  "total": 17,
-  "page": 1,
-  "size": 20,
-  "pages": 1
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "items": [
+      {
+        "id": "08b00319b4bf4b145022467b2f5b0cccf2732adfd063621517932e5308e5478e",
+        "mkt": ["zh-CN", "en-US", "ja-JP"],
+        "date": "2026-04-16",
+        "title": "蝙蝠信号：开启",
+        "copyright": "灰头狐蝠母亲携幼崽，雅拉湾国家公园，澳大利亚 (© Doug Gimesy/Nature Picture Library)",
+        "copyrightlink": "https://www.bing.com/search?q=gray-headed+flying+fox",
+        "width": 3840,
+        "height": 2160,
+        "bytes": 3522378,
+        "ext": "jpg",
+        "mime_type": "image/jpeg",
+        "thumbnail_url": "/api/images/08b003...e5478e?size=thumbnail",
+        "preview_url": "/api/images/08b003...e5478e?size=preview",
+        "download_url": "/api/images/08b003...e5478e/download"
+      }
+    ],
+    "total": 17,
+    "page": 1,
+    "size": 20,
+    "pages": 1
+  }
 }
 ```
 
@@ -130,9 +150,7 @@ curl "http://localhost:8000/api/filters"
 
 | 状态码 | 说明 |
 |--------|------|
-| 400 | keyword 未搭配 mkt/year/month/date/date_from/date_to 之一 |
-| 400 | `date` 与 `date_from` / `date_to` 冲突 |
-| 400 | `date_from` 晚于 `date_to` |
+| 400 | `msg` 以 `参数错误：` 开头，如 `参数错误：date_from 不能晚于 date_to` |
 
 ### 调用示例
 
@@ -185,8 +203,8 @@ curl "http://localhost:8000/api/wallpapers"
 
 | 状态码 | 说明 |
 |--------|------|
-| 404 | 图片不存在或文件丢失 |
-| 400 | size 参数无效 |
+| 404 | `msg` 固定为 `未找到数据` |
+| 400 | `msg` 以 `参数错误：` 开头，如 `参数错误：size 格式无效` |
 
 ### 调用示例
 
@@ -218,7 +236,7 @@ curl "http://localhost:8000/api/images/08b003...e5478e?size=thumbnail" -o thumb.
 
 | 状态码 | 说明 |
 |--------|------|
-| 404 | 图片不存在或文件丢失 |
+| 404 | `msg` 固定为 `未找到数据` |
 
 ### 调用示例
 
@@ -239,8 +257,12 @@ curl -O "http://localhost:8000/api/images/08b003...e5478e/download"
 
 ```json
 {
-  "id": "08b00319b4bf4b145022467b2f5b0cccf2732adfd063621517932e5308e5478e",
-  "image_url": "/api/images/08b00319b4bf4b145022467b2f5b0cccf2732adfd063621517932e5308e5478e?size=preview"
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "id": "08b00319b4bf4b145022467b2f5b0cccf2732adfd063621517932e5308e5478e",
+    "image_url": "/api/images/08b00319b4bf4b145022467b2f5b0cccf2732adfd063621517932e5308e5478e?size=preview"
+  }
 }
 ```
 
@@ -248,7 +270,7 @@ curl -O "http://localhost:8000/api/images/08b003...e5478e/download"
 
 | 状态码 | 说明 |
 |--------|------|
-| 404 | 当前没有可用壁纸 |
+| 404 | `msg` 固定为 `未找到数据` |
 
 ### 调用示例
 
@@ -268,12 +290,16 @@ curl "http://localhost:8000/api/wallpapers/random"
 
 ```json
 {
-  "status": "healthy",
-  "db_ok": true,
-  "last_success_at": "2026-04-18T02:23:54.182000+00:00",
-  "wallpaper_count": 89,
-  "resource_count": 19,
-  "markets_count": 11
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "status": "healthy",
+    "db_ok": true,
+    "last_success_at": "2026-04-18T02:23:54.182000+00:00",
+    "wallpaper_count": 89,
+    "resource_count": 19,
+    "markets_count": 11
+  }
 }
 ```
 

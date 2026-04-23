@@ -28,7 +28,7 @@ def _resolve_path(
         filepath = f"{resource.base_path}.{resource.ext}"
         media_type = resource.mime_type
     else:
-        raise HTTPException(status_code=400, detail="Invalid size parameter")
+        raise HTTPException(status_code=400, detail="size 参数无效")
 
     if not Path(filepath).exists():
         raise HTTPException(status_code=404, detail="File not found on disk")

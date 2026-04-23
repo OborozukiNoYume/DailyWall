@@ -1,3 +1,7 @@
+from fastapi.testclient import TestClient
+
+from app.main import app
+from app.services import health_service
 from app.models import Metadata, Resource
 
 
@@ -28,43 +32,56 @@ def _seed(api_client, db_session):
     db_session.commit()
 
 
+def _assert_success(resp):
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["code"] == 200
+    assert payload["msg"] == "success"
+    return payload["data"]
+
+
 def test_health(api_client):
     resp = api_client.get("/api/health")
-    assert resp.status_code == 200
-    data = resp.json()
+    data = _assert_success(resp)
     assert data["db_ok"] is True
 
 
 def test_filters_empty(api_client):
     resp = api_client.get("/api/filters")
-    assert resp.status_code == 200
-    data = resp.json()
+    data = _assert_success(resp)
     assert data["markets"] == []
     assert data["years"] == []
 
 
 def test_wallpapers_empty(api_client):
     resp = api_client.get("/api/wallpapers")
-    assert resp.status_code == 200
-    data = resp.json()
+    data = _assert_success(resp)
     assert data["total"] == 0
 
 
 def test_random_wallpaper_empty(api_client):
     resp = api_client.get("/api/wallpapers/random")
     assert resp.status_code == 404
+    data = resp.json()
+    assert data == {"code": 404, "msg": "未找到数据", "data": None}
 
 
 def test_wallpapers_keyword_alone_400(api_client):
     resp = api_client.get("/api/wallpapers?keyword=test")
     assert resp.status_code == 400
+    data = resp.json()
+    assert data["code"] == 400
+    assert (
+        data["msg"]
+        == "参数错误：keyword 必须搭配 mkt、year、month、date、date_from、date_to 之一"
+    )
+    assert data["data"] is None
 
 
 def test_wallpapers_exact_date_filter(api_client, db_session):
     _seed(api_client, db_session)
     resp = api_client.get("/api/wallpapers?date=2026-04-17")
-    assert resp.status_code == 200
-    data = resp.json()
+    data = _assert_success(resp)
     assert data["total"] == 1
     assert data["items"][0]["date"] == "2026-04-17"
 
@@ -99,8 +116,7 @@ def test_wallpapers_date_range_filter(api_client, db_session):
     resp = api_client.get(
         "/api/wallpapers?date_from=2026-04-18&date_to=2026-04-21"
     )
-    assert resp.status_code == 200
-    data = resp.json()
+    data = _assert_success(resp)
     assert data["total"] == 1
     assert data["items"][0]["date"] == "2026-04-20"
 
@@ -111,6 +127,10 @@ def test_wallpapers_date_conflict_400(api_client, db_session):
         "/api/wallpapers?date=2026-04-17&date_from=2026-04-01"
     )
     assert resp.status_code == 400
+    data = resp.json()
+    assert data["code"] == 400
+    assert data["msg"] == "参数错误：date 不能与 date_from 或 date_to 同时使用"
+    assert data["data"] is None
 
 
 def test_wallpapers_invalid_date_range_400(api_client, db_session):
@@ -119,23 +139,39 @@ def test_wallpapers_invalid_date_range_400(api_client, db_session):
         "/api/wallpapers?date_from=2026-04-20&date_to=2026-04-10"
     )
     assert resp.status_code == 400
+    data = resp.json()
+    assert data["code"] == 400
+    assert data["msg"] == "参数错误：date_from 不能晚于 date_to"
+    assert data["data"] is None
 
 
 def test_image_not_found(api_client):
     resp = api_client.get("/api/images/nonexistent?size=preview")
     assert resp.status_code == 404
+    data = resp.json()
+    assert data == {"code": 404, "msg": "未找到数据", "data": None}
 
 
 def test_download_not_found(api_client):
     resp = api_client.get("/api/images/nonexistent/download")
     assert resp.status_code == 404
+    data = resp.json()
+    assert data == {"code": 404, "msg": "未找到数据", "data": None}
+
+
+def test_image_invalid_size_400(api_client):
+    resp = api_client.get("/api/images/nonexistent?size=original")
+    assert resp.status_code == 400
+    data = resp.json()
+    assert data["code"] == 400
+    assert data["msg"] == "参数错误：size 格式无效"
+    assert data["data"] is None
 
 
 def test_wallpapers_with_data(api_client, db_session):
     _seed(api_client, db_session)
     resp = api_client.get("/api/wallpapers")
-    assert resp.status_code == 200
-    data = resp.json()
+    data = _assert_success(resp)
     assert data["total"] == 1
     assert data["items"][0]["id"] == "b" * 64
     assert (
@@ -147,8 +183,7 @@ def test_wallpapers_with_data(api_client, db_session):
 def test_random_wallpaper_with_data(api_client, db_session):
     _seed(api_client, db_session)
     resp = api_client.get("/api/wallpapers/random")
-    assert resp.status_code == 200
-    data = resp.json()
+    data = _assert_success(resp)
     assert data["id"] == "b" * 64
     assert data["image_url"] == f"/api/images/{'b' * 64}?size=preview"
 
@@ -156,8 +191,7 @@ def test_random_wallpaper_with_data(api_client, db_session):
 def test_filters_with_data(api_client, db_session):
     _seed(api_client, db_session)
     resp = api_client.get("/api/filters")
-    assert resp.status_code == 200
-    data = resp.json()
+    data = _assert_success(resp)
     assert "en-US" in data["markets"]
     assert 2026 in data["years"]
 
@@ -201,10 +235,22 @@ def test_wallpapers_dedup_mode(api_client, db_session):
     db_session.commit()
 
     resp = api_client.get("/api/wallpapers?dedup=true")
-    assert resp.status_code == 200
-    data = resp.json()
+    data = _assert_success(resp)
     assert data["total"] == 1
     assert data["items"][0]["mkt"] == ["zh-CN", "en-US"]
     assert data["items"][0]["title"] == "中文标题"
     assert data["items"][0]["date"] == "2026-04-18"
     assert data["items"][0]["copyrightlink"] == "https://www.bing.com/search?q=zh"
+
+
+def test_health_unexpected_error_500(api_client, monkeypatch):
+    def _raise(_session):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(health_service, "get_health", _raise)
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        resp = client.get("/api/health")
+    assert resp.status_code == 500
+    data = resp.json()
+    assert data == {"code": 500, "msg": "服务器异常", "data": None}

@@ -1,7 +1,15 @@
 from datetime import date as date_type
-from typing import Optional
+from typing import Generic, Optional, TypeVar
 
 from pydantic import BaseModel, Field
+
+T = TypeVar("T")
+
+
+class ApiResponse(BaseModel, Generic[T]):
+    code: int
+    msg: str
+    data: Optional[T] = None
 
 
 class WallpaperQueryParams(BaseModel):

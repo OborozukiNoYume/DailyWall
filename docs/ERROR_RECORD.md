@@ -59,3 +59,15 @@
 - **原因**：我写入 `crontab` 的命令使用了 `printf "[%s] ..."` 和 `date -Iseconds`，其中 `%` 在 Cron 命令中具有特殊含义，未转义时会被当作换行分隔，导致实际执行命令被破坏
 - **解决**：确认任务未成功执行，并记录该错误；后续应改为转义 `%` 或改用不含 `%` 的 shell 形式重建测试任务
 - **教训**：写入 `crontab` 的命令不能直接复用普通 shell 命令模板，必须先检查 `%`、换行和重定向在 Cron 语境下的特殊解析规则
+
+### [2026-04-23 15:30] 误用系统 Python 导致虚拟环境状态判断错误
+- **现象**：我在验证 API 修改时报告当前环境缺少 `pytest` 和 `uvicorn`，并据此说明运行时验证未执行
+- **原因**：我直接使用了系统 `python3` 和系统命令环境，没有优先使用项目约定的 `uv` / `.venv` 解释器，导致把系统环境状态误判成项目环境状态
+- **解决**：改用 `./.venv/bin/python` 重新确认，已验证项目虚拟环境存在，且其中已安装 `pytest`、`uvicorn`、`fastapi`
+- **教训**：本项目涉及 Python 运行、测试、导入验证时，应优先使用 `uv run ...` 或 `./.venv/bin/python ...`，不能先用系统解释器替代项目虚拟环境
+
+### [2026-04-23 15:30] FastAPI 500 测试未考虑 TestClient 默认抛异常行为
+- **现象**：我新增的 `500` 响应测试运行失败，`api_client.get("/api/health")` 直接抛出 `RuntimeError`，没有返回可断言的 JSON 响应
+- **原因**：Starlette/FastAPI 的 `TestClient` 默认 `raise_server_exceptions=True`，服务端未处理异常会被直接重新抛出；我写测试时忽略了这个默认行为
+- **解决**：改为在该测试中单独使用 `TestClient(app, raise_server_exceptions=False)` 获取实际 `500` 响应
+- **教训**：验证 FastAPI 全局异常处理时，若目标是断言最终 HTTP 500 响应，应显式关闭 `raise_server_exceptions`，不能直接复用默认测试客户端

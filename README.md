@@ -37,6 +37,10 @@ curl http://127.0.0.1:8000/api/health
 
 API 文档：`http://localhost:8000/redoc`
 
+说明：
+- JSON 接口统一返回 `{ "code": 状态码, "msg": "说明", "data": ... }`
+- 图片文件接口成功时仍直接返回文件流
+
 如果希望由 `systemd` 常驻管理 API：
 
 ```bash
@@ -99,6 +103,8 @@ DailyWall/
 
 ## API 概览
 
+JSON 接口统一返回 `{ "code": 状态码, "msg": "说明", "data": ... }`，业务数据位于 `data` 字段内。
+
 | 端点 | 说明 |
 |------|------|
 | `GET /api/filters` | 获取筛选选项（地区/年份/月份） |
@@ -127,7 +133,7 @@ sudo systemctl restart dailywall-api.service
 sudo systemctl stop dailywall-api.service
 ```
 
-健康检查返回 `status=healthy` 且 `db_ok=true` 时，表示 API 服务和数据库连接正常：
+健康检查返回 `code=200`、`data.status=healthy` 且 `data.db_ok=true` 时，表示 API 服务和数据库连接正常：
 
 ```bash
 curl http://127.0.0.1:8000/api/health

@@ -37,6 +37,8 @@ curl http://127.0.0.1:8000/api/health
 
 API 文档：`http://localhost:8000/redoc`
 
+免责声明：本项目仅作为 Bing 壁纸归档抓取只读 API 的工具。
+
 说明：
 - JSON 接口统一返回 `{ "code": 状态码, "msg": "说明", "data": ... }`
 - 图片文件接口成功时仍直接返回文件流

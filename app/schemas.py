@@ -1,3 +1,4 @@
+from datetime import date as date_type
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -7,6 +8,9 @@ class WallpaperQueryParams(BaseModel):
     mkt: Optional[str] = None
     year: Optional[int] = None
     month: Optional[int] = None
+    date: Optional[date_type] = None
+    date_from: Optional[date_type] = None
+    date_to: Optional[date_type] = None
     keyword: Optional[str] = Field(default=None, min_length=2)
     dedup: bool = False
     page: int = Field(default=1, ge=1)

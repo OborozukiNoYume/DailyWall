@@ -43,6 +43,12 @@ def _build_filtered_query(session: Session, params: WallpaperQueryParams):
         query = query.filter(Resource.year == params.year)
     if params.month:
         query = query.filter(Resource.month == params.month)
+    if params.date:
+        query = query.filter(Metadata.date == params.date.isoformat())
+    if params.date_from:
+        query = query.filter(Metadata.date >= params.date_from.isoformat())
+    if params.date_to:
+        query = query.filter(Metadata.date <= params.date_to.isoformat())
     if params.keyword:
         keyword = f"%{params.keyword}%"
         query = query.filter(
@@ -207,9 +213,24 @@ def _list_wallpapers_dedup(
 def list_wallpapers(
     session: Session, params: WallpaperQueryParams
 ) -> WallpaperListResponse:
-    if params.keyword and not any([params.mkt, params.year, params.month]):
+    if params.date and (params.date_from or params.date_to):
+        raise ValueError("date cannot be combined with date_from or date_to")
+
+    if params.date_from and params.date_to and params.date_from > params.date_to:
+        raise ValueError("date_from cannot be later than date_to")
+
+    if params.keyword and not any(
+        [
+            params.mkt,
+            params.year,
+            params.month,
+            params.date,
+            params.date_from,
+            params.date_to,
+        ]
+    ):
         raise ValueError(
-            "keyword requires at least one of mkt, year, month"
+            "keyword requires at least one of mkt, year, month, date, date_from, date_to"
         )
 
     if params.dedup:

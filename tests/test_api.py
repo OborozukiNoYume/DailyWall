@@ -60,6 +60,67 @@ def test_wallpapers_keyword_alone_400(api_client):
     assert resp.status_code == 400
 
 
+def test_wallpapers_exact_date_filter(api_client, db_session):
+    _seed(api_client, db_session)
+    resp = api_client.get("/api/wallpapers?date=2026-04-17")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+    assert data["items"][0]["date"] == "2026-04-17"
+
+
+def test_wallpapers_date_range_filter(api_client, db_session):
+    sha = "d" * 64
+    resource = Resource(
+        sha256=sha,
+        year=2026,
+        month=4,
+        base_path="wallpaper/2026/04/" + sha,
+        ext="jpg",
+        mime_type="image/jpeg",
+        width=1920,
+        height=1080,
+        bytes=1000000,
+    )
+    db_session.add(resource)
+    db_session.add(
+        Metadata(
+            mkt="en-US",
+            date="2026-04-20",
+            sha256=sha,
+            hsh="api_test_hsh_range",
+            title="API Range Test",
+            copyright="API Range Copyright",
+            copyrightlink="https://www.bing.com/search?q=api-range-test",
+        )
+    )
+    db_session.commit()
+
+    resp = api_client.get(
+        "/api/wallpapers?date_from=2026-04-18&date_to=2026-04-21"
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+    assert data["items"][0]["date"] == "2026-04-20"
+
+
+def test_wallpapers_date_conflict_400(api_client, db_session):
+    _seed(api_client, db_session)
+    resp = api_client.get(
+        "/api/wallpapers?date=2026-04-17&date_from=2026-04-01"
+    )
+    assert resp.status_code == 400
+
+
+def test_wallpapers_invalid_date_range_400(api_client, db_session):
+    _seed(api_client, db_session)
+    resp = api_client.get(
+        "/api/wallpapers?date_from=2026-04-20&date_to=2026-04-10"
+    )
+    assert resp.status_code == 400
+
+
 def test_image_not_found(api_client):
     resp = api_client.get("/api/images/nonexistent?size=preview")
     assert resp.status_code == 404

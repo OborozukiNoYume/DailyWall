@@ -45,10 +45,19 @@ curl "http://localhost:8000/api/filters"
 | `mkt` | string | 否 | 地区筛选（如 en-US、zh-CN） |
 | `year` | integer | 否 | 年份筛选 |
 | `month` | integer | 否 | 月份筛选 |
-| `keyword` | string | 否 | 关键词检索（最少 2 字符），需搭配 mkt/year/month 之一 |
+| `date` | string | 否 | 精确日期筛选，格式 `YYYY-MM-DD` |
+| `date_from` | string | 否 | 起始日期筛选，格式 `YYYY-MM-DD` |
+| `date_to` | string | 否 | 结束日期筛选，格式 `YYYY-MM-DD` |
+| `keyword` | string | 否 | 关键词检索（最少 2 字符），需搭配 mkt/year/month/date/date_from/date_to 之一 |
 | `dedup` | boolean | 否 | 是否按 `resources.sha256` 去重，默认 `false` |
 | `page` | integer | 否 | 页码，默认 1，≥1 |
 | `size` | integer | 否 | 每页条数，默认 20，范围 1-100 |
+
+### 日期筛选规则
+
+- `date` 用于精确某一天，不能和 `date_from` / `date_to` 同时使用
+- `date_from` / `date_to` 可单独使用，也可组合为闭区间筛选
+- 当同时提供 `date_from` 和 `date_to` 时，`date_from` 不能晚于 `date_to`
 
 ### `dedup=true` 行为说明
 
@@ -121,13 +130,21 @@ curl "http://localhost:8000/api/filters"
 
 | 状态码 | 说明 |
 |--------|------|
-| 400 | keyword 未搭配 mkt/year/month 之一 |
+| 400 | keyword 未搭配 mkt/year/month/date/date_from/date_to 之一 |
+| 400 | `date` 与 `date_from` / `date_to` 冲突 |
+| 400 | `date_from` 晚于 `date_to` |
 
 ### 调用示例
 
 ```bash
 # 获取 zh-CN 地区 2026 年 4 月壁纸
 curl "http://localhost:8000/api/wallpapers?mkt=zh-CN&year=2026&month=4"
+
+# 获取 zh-CN 地区某一天壁纸
+curl "http://localhost:8000/api/wallpapers?mkt=zh-CN&date=2026-04-21"
+
+# 获取某个日期区间内的壁纸
+curl "http://localhost:8000/api/wallpapers?date_from=2026-04-01&date_to=2026-04-21"
 
 # 关键词搜索（必须搭配筛选条件）
 curl "http://localhost:8000/api/wallpapers?mkt=zh-CN&keyword=蝙蝠"

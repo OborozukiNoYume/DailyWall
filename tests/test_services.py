@@ -77,6 +77,28 @@ def test_filter_by_year(db_session):
     assert result.total == 1
 
 
+def test_filter_by_exact_date(db_session):
+    _insert_wallpaper(db_session, 1, date="2026-04-17")
+    _insert_wallpaper(db_session, 2, date="2026-04-18")
+    params = WallpaperQueryParams(date="2026-04-17")
+    result = wallpaper_service.list_wallpapers(db_session, params)
+    assert result.total == 1
+    assert result.items[0].date == "2026-04-17"
+
+
+def test_filter_by_date_range(db_session):
+    _insert_wallpaper(db_session, 1, date="2026-04-15")
+    _insert_wallpaper(db_session, 2, date="2026-04-18")
+    _insert_wallpaper(db_session, 3, date="2026-04-21")
+    params = WallpaperQueryParams(
+        date_from="2026-04-16",
+        date_to="2026-04-20",
+    )
+    result = wallpaper_service.list_wallpapers(db_session, params)
+    assert result.total == 1
+    assert result.items[0].date == "2026-04-18"
+
+
 def test_keyword_requires_filter(db_session):
     params = WallpaperQueryParams(keyword="test")
     with pytest.raises(ValueError, match="keyword requires"):
@@ -88,6 +110,31 @@ def test_keyword_with_mkt(db_session):
     params = WallpaperQueryParams(mkt="zh-CN", keyword="Title")
     result = wallpaper_service.list_wallpapers(db_session, params)
     assert result.total == 1
+
+
+def test_keyword_with_date_filter(db_session):
+    _insert_wallpaper(db_session, 1, date="2026-04-17", title="Aurora Sky")
+    params = WallpaperQueryParams(date="2026-04-17", keyword="Aurora")
+    result = wallpaper_service.list_wallpapers(db_session, params)
+    assert result.total == 1
+
+
+def test_date_conflicts_with_range(db_session):
+    params = WallpaperQueryParams(
+        date="2026-04-17",
+        date_from="2026-04-01",
+    )
+    with pytest.raises(ValueError, match="date cannot be combined"):
+        wallpaper_service.list_wallpapers(db_session, params)
+
+
+def test_invalid_date_range_order(db_session):
+    params = WallpaperQueryParams(
+        date_from="2026-04-20",
+        date_to="2026-04-10",
+    )
+    with pytest.raises(ValueError, match="date_from cannot be later"):
+        wallpaper_service.list_wallpapers(db_session, params)
 
 
 def test_pagination(db_session):

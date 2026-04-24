@@ -28,3 +28,8 @@ packages = ["app", "crawler"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[dependency-groups]
+dev = [
+    "pytest-cov>=7.1.0",
+]

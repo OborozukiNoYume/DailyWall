@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.services import health_service
-from app.models import Metadata, Resource
+from app.models import CrawlRun, CrawlState, Metadata, Resource
 
 
 def _seed(api_client, db_session):
@@ -43,7 +43,12 @@ def _assert_success(resp):
 def test_health(api_client):
     resp = api_client.get("/api/health")
     data = _assert_success(resp)
+    assert data["status"] == "healthy"
     assert data["db_ok"] is True
+    assert data["last_success_at"] is None
+    assert data["wallpaper_count"] == 0
+    assert data["resource_count"] == 0
+    assert data["markets_count"] == 0
 
 
 def test_filters_empty(api_client):
@@ -51,6 +56,7 @@ def test_filters_empty(api_client):
     data = _assert_success(resp)
     assert data["markets"] == []
     assert data["years"] == []
+    assert data["year_months"] == {}
 
 
 def test_wallpapers_empty(api_client):
@@ -199,6 +205,39 @@ def test_filters_with_data(api_client, db_session):
     data = _assert_success(resp)
     assert "en-US" in data["markets"]
     assert 2026 in data["years"]
+    assert data["year_months"] == {"2026": [4]}
+
+
+def test_health_with_aggregated_data(api_client, db_session):
+    _seed(api_client, db_session)
+    db_session.add(
+        CrawlState(
+            mkt="en-US",
+            last_success_date="2026-04-17",
+            last_attempt_at="2026-04-17T00:00:00",
+            consecutive_failures=0,
+        )
+    )
+    db_session.add(
+        CrawlRun(
+            run_date="2026-04-17",
+            started_at="2026-04-17T00:00:00",
+            finished_at="2026-04-17T00:01:00",
+            status="success",
+            success_count=1,
+            fail_count=0,
+        )
+    )
+    db_session.commit()
+
+    resp = api_client.get("/api/health")
+    data = _assert_success(resp)
+    assert data["status"] == "healthy"
+    assert data["db_ok"] is True
+    assert data["last_success_at"] == "2026-04-17T00:01:00"
+    assert data["wallpaper_count"] == 1
+    assert data["resource_count"] == 1
+    assert data["markets_count"] == 1
 
 
 def test_wallpapers_dedup_mode(api_client, db_session):

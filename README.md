@@ -92,16 +92,41 @@ DailyWall/
 │   ├── crawl.py             # Cron 采集入口（含日志轮转）
 │   ├── backup.py            # SQLite 备份（30 天轮转）
 │   └── check.py             # 巡检脚本（daily/weekly/status）
-├── tests/
-│   ├── conftest.py          # 测试 fixtures（内存 DB、TestClient）
-│   ├── test_api.py          # API 端点测试
-│   ├── test_services.py     # 服务层测试
-│   ├── test_crawler.py      # 去重逻辑测试
-│   └── test_image_utils.py  # 图片工具测试
+├── tests/                   # 自动化测试
 ├── docs/                    # 详细文档
 ├── pyproject.toml
 └── .env.example
 ```
+
+## 测试
+
+运行完整自动化测试：
+
+```bash
+uv run pytest
+```
+
+当前测试目录：
+
+```text
+tests/
+├── conftest.py           # 测试 fixtures（内存 DB、TestClient）
+├── test_api.py           # API 端点测试
+├── test_bing_fetcher.py  # Bing API 客户端与 URL 构造测试
+├── test_crawler.py       # 采集编排、去重与状态更新测试
+├── test_downloader.py    # 下载、落盘与图片预处理测试
+├── test_image_service.py # 图片文件服务测试
+├── test_image_utils.py   # 图片工具测试
+├── test_responses.py     # 统一响应与参数错误格式测试
+├── test_scripts.py       # 脚本入口与巡检/备份测试
+└── test_services.py      # 服务层测试
+```
+
+说明：
+
+- 测试依赖通过 `uv sync --dev` 安装。
+- `pytest` 配置位于 `pyproject.toml`，默认会从 `tests/` 目录收集用例。
+- README 和运维文档中提到的 `dailywall-crawl-test.service`、`dailywall-crawl-test.timer` 属于 `systemd` 定时任务验证单元，不属于 `pytest` 自动化测试套件。
 
 ## API 概览
 

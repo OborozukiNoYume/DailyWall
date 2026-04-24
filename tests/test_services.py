@@ -1,6 +1,6 @@
 import pytest
 
-from app.models import Metadata, Resource
+from app.models import CrawlRun, CrawlState, Metadata, Resource
 from app.schemas import WallpaperQueryParams
 from app.services import wallpaper_service, filter_service, health_service
 
@@ -257,6 +257,59 @@ def test_get_random_wallpaper(db_session):
     assert result.width == 1920
     assert result.height == 1080
     assert result.image_url == f"/api/images/{sha}?size=preview"
+
+
+def test_filter_options_include_year_months(db_session):
+    filter_service._cache.clear()
+    _insert_wallpaper(db_session, 1, year=2026, month=4)
+    _insert_wallpaper(db_session, 2, year=2026, month=5)
+    _insert_wallpaper(db_session, 3, year=2025, month=12, mkt="en-US")
+
+    result = filter_service.get_filter_options(db_session)
+
+    assert result.markets == ["en-US", "zh-CN"]
+    assert result.years == [2026, 2025]
+    assert result.year_months == {2026: [4, 5], 2025: [12]}
+
+
+def test_health_returns_aggregated_fields(db_session):
+    _insert_wallpaper(db_session, 1, mkt="zh-CN")
+    db_session.add(
+        CrawlState(
+            mkt="zh-CN",
+            last_success_date="2026-04-01",
+            last_attempt_at="2026-04-01T00:00:00",
+            consecutive_failures=0,
+        )
+    )
+    db_session.add(
+        CrawlState(
+            mkt="en-US",
+            last_success_date="2026-04-02",
+            last_attempt_at="2026-04-02T00:00:00",
+            consecutive_failures=0,
+        )
+    )
+    db_session.add(
+        CrawlRun(
+            run_date="2026-04-02",
+            started_at="2026-04-02T00:00:00",
+            finished_at="2026-04-02T00:01:00",
+            status="success",
+            success_count=1,
+            fail_count=0,
+        )
+    )
+    db_session.commit()
+
+    result = health_service.get_health(db_session)
+
+    assert result.status == "healthy"
+    assert result.db_ok is True
+    assert result.last_success_at == "2026-04-02T00:01:00"
+    assert result.wallpaper_count == 1
+    assert result.resource_count == 1
+    assert result.markets_count == 2
 
 
 def test_filter_options(db_session):

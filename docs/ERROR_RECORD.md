@@ -71,3 +71,9 @@
 - **原因**：Starlette/FastAPI 的 `TestClient` 默认 `raise_server_exceptions=True`，服务端未处理异常会被直接重新抛出；我写测试时忽略了这个默认行为
 - **解决**：改为在该测试中单独使用 `TestClient(app, raise_server_exceptions=False)` 获取实际 `500` 响应
 - **教训**：验证 FastAPI 全局异常处理时，若目标是断言最终 HTTP 500 响应，应显式关闭 `raise_server_exceptions`，不能直接复用默认测试客户端
+
+### [2026-04-24 13:53] JSONResponse 字节断言误把 UTF-8 输出当成转义字符串
+- **现象**：我为统一错误响应新增测试时，错误地断言 `response.body` 应等于带 `\uXXXX` 转义的字节串，导致测试失败并需要返工
+- **原因**：我把 JSON 文本展示形式和 `JSONResponse` 实际返回的 UTF-8 字节内容混为一谈，断言绑定到了错误的序列化细节
+- **解决**：将断言改为先按 UTF-8 解码，再比较实际 JSON 文本内容，避免对转义形式做错误假设
+- **教训**：涉及响应体断言时，应优先比较解析后的结构或稳定文本，而不是先入为主地假设底层字节编码形式

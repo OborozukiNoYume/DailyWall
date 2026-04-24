@@ -215,3 +215,7 @@ logs/
 *.db-wal
 *.db-shm
 backups/
+
+# DailyWall coverage reports
+!docs/coverage.xml
+docs/coverage_html/

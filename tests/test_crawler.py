@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 from app.config import settings
 from app.models import CrawlState, Metadata, Resource
 from crawler.crawler import Crawler, CrawlResult
+from crawler.downloader import DownloadResult
 from scripts import crawl as crawl_script
 
 
@@ -187,6 +188,114 @@ def test_run_returns_partial_result(db_session, tmp_path):
             result = crawler.run()
 
     assert result == CrawlResult("partial", 1, 1)
+
+
+def test_process_image_missing_startdate_returns_false(db_session):
+    crawler = Crawler.__new__(Crawler)
+
+    result = crawler._process_image(db_session, "en-US", {"title": "No date"})
+
+    assert result is False
+    assert db_session.query(Resource).count() == 0
+    assert db_session.query(Metadata).count() == 0
+
+
+def test_process_image_missing_uhd_url_returns_false(db_session):
+    crawler = Crawler.__new__(Crawler)
+
+    with patch("crawler.crawler.get_uhd_url", return_value=""):
+        result = crawler._process_image(
+            db_session,
+            "en-US",
+            {"startdate": "20260418", "title": "No URL"},
+        )
+
+    assert result is False
+    assert db_session.query(Resource).count() == 0
+    assert db_session.query(Metadata).count() == 0
+
+
+def test_process_image_new_resource_persists_records(db_session):
+    crawler = Crawler.__new__(Crawler)
+    sha = "e" * 64
+    dl_result = DownloadResult(
+        sha256=sha,
+        width=3840,
+        height=2160,
+        mime_type="image/jpeg",
+        file_size=543210,
+        ext="jpg",
+        original_path=f"/tmp/{sha}.jpg",
+        thumbnail_path=f"/tmp/{sha}_thumbnail.jpg",
+        preview_path=f"/tmp/{sha}_preview.jpg",
+        base_path=f"wallpaper/2026/04/{sha}",
+    )
+
+    mock_response = MagicMock()
+    mock_response.content = b"fake image data"
+    mock_response.raise_for_status = MagicMock()
+
+    mock_client = MagicMock()
+    mock_client.__enter__ = MagicMock(return_value=mock_client)
+    mock_client.__exit__ = MagicMock(return_value=False)
+    mock_client.get.return_value = mock_response
+
+    with patch("crawler.crawler.get_uhd_url", return_value="https://example.com/uhd.jpg"):
+        with patch("crawler.crawler.create_http_client", return_value=mock_client):
+            with patch("crawler.crawler.calculate_sha256", return_value=sha):
+                with patch(
+                    "crawler.crawler.tempfile.mkstemp",
+                    return_value=(3, "/tmp/test-new.jpg"),
+                ):
+                    with patch("crawler.crawler.os.fdopen", MagicMock()):
+                        with patch("crawler.crawler.os.unlink"):
+                            with patch(
+                                "crawler.crawler.download_and_process",
+                                return_value=dl_result,
+                            ):
+                                result = crawler._process_image(
+                                    db_session,
+                                    "en-US",
+                                    {
+                                        "startdate": "20260418",
+                                        "hsh": "fresh_hsh",
+                                        "title": "Fresh Title",
+                                        "copyright": "Fresh Copyright",
+                                        "copyrightlink": "https://example.com/copyright",
+                                    },
+                                )
+
+    assert result is True
+    resource = db_session.get(Resource, sha)
+    assert resource is not None
+    assert resource.year == 2026
+    assert resource.month == 4
+    assert resource.bytes == 543210
+
+    metadata = db_session.query(Metadata).filter_by(mkt="en-US").first()
+    assert metadata is not None
+    assert metadata.date == "2026-04-18"
+    assert metadata.sha256 == sha
+    assert metadata.copyrightlink == "https://example.com/copyright"
+
+
+def test_update_crawl_state_caps_failures_and_resets_on_success(db_session):
+    crawler = Crawler.__new__(Crawler)
+
+    for _ in range(12):
+        crawler._update_crawl_state(db_session, "en-US", False)
+
+    state = db_session.query(CrawlState).filter_by(mkt="en-US").first()
+    assert state is not None
+    assert state.consecutive_failures == 10
+    assert state.last_success_date is None
+    assert state.last_attempt_at is not None
+
+    crawler._update_crawl_state(db_session, "en-US", True)
+
+    db_session.refresh(state)
+    assert state.consecutive_failures == 0
+    assert state.last_success_date is not None
 
 
 def test_script_main_returns_nonzero_for_partial(monkeypatch):

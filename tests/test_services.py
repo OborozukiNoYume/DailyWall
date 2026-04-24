@@ -101,7 +101,10 @@ def test_filter_by_date_range(db_session):
 
 def test_keyword_requires_filter(db_session):
     params = WallpaperQueryParams(keyword="test")
-    with pytest.raises(ValueError, match="keyword requires"):
+    with pytest.raises(
+        ValueError,
+        match="keyword 必须搭配 mkt、year、month、date、date_from、date_to 之一",
+    ):
         wallpaper_service.list_wallpapers(db_session, params)
 
 
@@ -124,7 +127,7 @@ def test_date_conflicts_with_range(db_session):
         date="2026-04-17",
         date_from="2026-04-01",
     )
-    with pytest.raises(ValueError, match="date cannot be combined"):
+    with pytest.raises(ValueError, match="date 不能与 date_from 或 date_to 同时使用"):
         wallpaper_service.list_wallpapers(db_session, params)
 
 
@@ -133,7 +136,7 @@ def test_invalid_date_range_order(db_session):
         date_from="2026-04-20",
         date_to="2026-04-10",
     )
-    with pytest.raises(ValueError, match="date_from cannot be later"):
+    with pytest.raises(ValueError, match="date_from 不能晚于 date_to"):
         wallpaper_service.list_wallpapers(db_session, params)
 
 
@@ -248,6 +251,11 @@ def test_get_random_wallpaper(db_session):
     result = wallpaper_service.get_random_wallpaper(db_session)
 
     assert result.id == sha
+    assert result.title == "Title 1"
+    assert result.copyright == "Copyright 1"
+    assert result.copyrightlink is None
+    assert result.width == 1920
+    assert result.height == 1080
     assert result.image_url == f"/api/images/{sha}?size=preview"
 
 

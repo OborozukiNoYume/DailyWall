@@ -185,6 +185,11 @@ def test_random_wallpaper_with_data(api_client, db_session):
     resp = api_client.get("/api/wallpapers/random")
     data = _assert_success(resp)
     assert data["id"] == "b" * 64
+    assert data["title"] == "API Test"
+    assert data["copyright"] == "API Copyright"
+    assert data["copyrightlink"] == "https://www.bing.com/search?q=api-test"
+    assert data["width"] == 1920
+    assert data["height"] == 1080
     assert data["image_url"] == f"/api/images/{'b' * 64}?size=preview"
 
 

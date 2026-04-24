@@ -252,6 +252,7 @@ curl -O "http://localhost:8000/api/images/08b003...e5478e/download"
 
 返回一张随机壁纸的可直接引用图片 URL，适合前端页面初始化时调用一次并直接用于 `<img src>`。
 `image_url` 为站内相对路径，前端可直接作为同源地址使用，或按部署域名拼成完整 URL。
+元数据字段使用该图片关联记录中的首选条目，优先级与 `dedup=true` 一致：`zh-CN` > `en-US` > 其他。
 
 ### 响应示例
 
@@ -261,6 +262,11 @@ curl -O "http://localhost:8000/api/images/08b003...e5478e/download"
   "msg": "success",
   "data": {
     "id": "08b00319b4bf4b145022467b2f5b0cccf2732adfd063621517932e5308e5478e",
+    "title": "蝙蝠信号：开启",
+    "copyright": "灰头狐蝠母亲携幼崽，雅拉湾国家公园，澳大利亚 (© Doug Gimesy/Nature Picture Library)",
+    "copyrightlink": "https://www.bing.com/search?q=gray-headed+flying+fox",
+    "width": 3840,
+    "height": 2160,
     "image_url": "/api/images/08b00319b4bf4b145022467b2f5b0cccf2732adfd063621517932e5308e5478e?size=preview"
   }
 }

@@ -250,7 +250,19 @@ def get_random_wallpaper(session: Session) -> RandomWallpaperResponse:
     if resource is None:
         raise HTTPException(status_code=404, detail="No wallpaper found")
 
+    metadata_rows = (
+        session.query(Metadata)
+        .filter(Metadata.is_deleted == 0, Metadata.sha256 == resource.sha256)
+        .all()
+    )
+    preferred = min(metadata_rows, key=_metadata_priority)
+
     return RandomWallpaperResponse(
         id=resource.sha256,
+        title=preferred.title,
+        copyright=preferred.copyright,
+        copyrightlink=preferred.copyrightlink,
+        width=resource.width,
+        height=resource.height,
         image_url=f"/api/images/{resource.sha256}?size=preview",
     )

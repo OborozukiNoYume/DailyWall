@@ -52,6 +52,11 @@ class WallpaperListResponse(BaseModel):
 
 class RandomWallpaperResponse(BaseModel):
     id: str
+    title: Optional[str] = None
+    copyright: Optional[str] = None
+    copyrightlink: Optional[str] = None
+    width: int
+    height: int
     image_url: str
 
 

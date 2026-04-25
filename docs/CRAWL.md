@@ -22,6 +22,16 @@
 - **冷启动**：首次运行自动拉取最近 8 天数据（`idx=0, n=8`）
 - **重复执行策略**：当前实现每次都会请求最近 8 天数据，再依靠 `(mkt, date)` 和 `SHA256` 双重去重避免重复入库；`crawl_state` 当前仅用于记录状态，不参与断点续采
 
+### 采集日志
+
+- `scripts/crawl.py` 会自动初始化统一日志配置，正式业务日志写入 `logs/crawl.log`
+- 采集过程按 `INFO / WARNING / ERROR` 分层：
+  - `INFO`：开始、结束、去重命中、新增资源、汇总统计
+  - `WARNING`：跳过、字段缺失、无法构造下载地址、重复任务
+  - `ERROR`：请求失败、处理失败、运行异常
+- 所有采集链路中的错误还会额外汇总到 `logs/error.log`
+- 如果通过 `cron` 或 `systemd` 触发任务，`logs/cron.log`、`logs/systemd-crawl.log` 只用于记录调度开始和退出码，不替代 `crawl.log`
+
 ### 采集流程
 
 1. 获取文件锁（`fcntl.flock`，非阻塞排他锁）
@@ -138,3 +148,8 @@ curl http://127.0.0.1:8000/api/health
 ```
 
 健康检查返回 `code=200`、`data.status=healthy` 且 `data.db_ok=true` 时，表示 API 已成功连接本地数据库。
+
+如需确认本次采集是否成功，建议至少检查：
+
+- `logs/crawl.log` 中存在 `Crawl finished: status=success ...`
+- 若为定时任务，还应确认 `logs/cron.log` 或 `logs/systemd-crawl.log` 中存在对应的退出码记录

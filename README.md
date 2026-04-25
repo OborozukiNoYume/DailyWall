@@ -57,6 +57,7 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 - 首次采集会自动初始化数据库和运行目录
 - 如果部署环境位于中国大陆，通常需要在 `.env` 中配置 `PROXY_URL`
+- 正式日志默认写入 `logs/` 目录，其中 `crawl.log`、`api.log`、`maintenance.log` 分别对应采集、API、维护脚本，`error.log` 汇总所有错误日志
 - 更完整的安装、配置与采集说明见 [docs/INSTALL.md](docs/INSTALL.md) 和 [docs/CRAWL.md](docs/CRAWL.md)
 
 ## API 概览
@@ -87,6 +88,7 @@ DailyWall/
 ├── app/          # FastAPI 应用、路由、服务、模型
 ├── crawler/      # Bing 抓取、下载、去重、入库
 ├── scripts/      # 采集、巡检、备份脚本
+├── logs/         # 运行日志目录（自动创建）
 ├── docs/         # 详细文档
 ├── tests/        # 自动化测试
 ├── .env.example  # 配置示例

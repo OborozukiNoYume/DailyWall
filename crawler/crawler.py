@@ -1,5 +1,4 @@
 import fcntl
-import logging
 import os
 import tempfile
 from dataclasses import dataclass
@@ -10,12 +9,13 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_crawler_engine
+from app.logging_utils import get_component_logger
 from app.models import CrawlRun, CrawlState, Metadata, Resource
 from app.utils.image_utils import calculate_sha256
 from crawler.bing_fetcher import create_http_client, fetch_images, get_uhd_url
 from crawler.downloader import download_and_process
 
-logger = logging.getLogger(__name__)
+logger = get_component_logger("crawl", __name__)
 
 
 @dataclass(frozen=True)

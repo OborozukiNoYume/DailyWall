@@ -1,17 +1,24 @@
 import argparse
 import hashlib
-import sys
 from pathlib import Path
 
 from app.config import settings
 from app.database import get_crawler_engine
+from app.logging_utils import configure_logging, get_component_logger
 from app.models import CrawlRun, CrawlState, Metadata, Resource
 from app.utils.image_utils import validate_image
 from sqlalchemy.orm import Session
 
+logger = get_component_logger("maintenance", __name__)
+
+
+def setup_logging():
+    return configure_logging("maintenance", log_dir=settings.LOG_DIR)
+
 
 def daily_inspect(session: Session):
     """Check file existence and basic validity."""
+    setup_logging()
     resources = (
         session.query(Resource).filter(Resource.is_deleted == 0).all()
     )
@@ -34,24 +41,25 @@ def daily_inspect(session: Session):
             elif label != "original" and not validate_image(filepath):
                 invalid.append((res.sha256, label, "corrupt"))
 
-    print(f"Checked {len(resources)} resources")
+    logger.info("Checked %d resources", len(resources))
     if missing:
-        print(f"\nMissing files ({len(missing)}):")
+        logger.warning("Missing files (%d):", len(missing))
         for sha, label, path in missing:
-            print(f"  {sha[:12]} {label}: {path}")
+            logger.warning("%s %s: %s", sha[:12], label, path)
     if invalid:
-        print(f"\nInvalid files ({len(invalid)}):")
+        logger.warning("Invalid files (%d):", len(invalid))
         for sha, label, reason in invalid:
-            print(f"  {sha[:12]} {label}: {reason}")
+            logger.warning("%s %s: %s", sha[:12], label, reason)
     if not missing and not invalid:
-        print("All files OK")
+        logger.info("All files OK")
 
 
 def weekly_inspect(session: Session):
     """SHA256 deep check on originals + daily checks."""
+    setup_logging()
     daily_inspect(session)
 
-    print("\n--- Weekly SHA256 verification ---")
+    logger.info("--- Weekly SHA256 verification ---")
     resources = (
         session.query(Resource).filter(Resource.is_deleted == 0).all()
     )
@@ -71,15 +79,18 @@ def weekly_inspect(session: Session):
             mismatch.append((res.sha256, actual))
 
     if mismatch:
-        print(f"\nSHA256 mismatches ({len(mismatch)}):")
+        logger.error("SHA256 mismatches (%d):", len(mismatch))
         for expected, actual in mismatch:
-            print(f"  expected: {expected[:12]}  actual: {actual[:12]}")
+            logger.error(
+                "expected: %s  actual: %s", expected[:12], actual[:12]
+            )
     else:
-        print("All SHA256 checksums OK")
+        logger.info("All SHA256 checksums OK")
 
 
 def show_status(session: Session):
     """Show summary status."""
+    setup_logging()
     from sqlalchemy import func
 
     res_count = (
@@ -95,8 +106,8 @@ def show_status(session: Session):
         .scalar()
     )
 
-    print(f"Resources: {res_count}")
-    print(f"Metadata entries: {meta_count}")
+    logger.info("Resources: %s", res_count)
+    logger.info("Metadata entries: %s", meta_count)
 
     runs = (
         session.query(CrawlRun)
@@ -104,20 +115,25 @@ def show_status(session: Session):
         .limit(10)
         .all()
     )
-    print(f"\nLast {len(runs)} crawl runs:")
+    logger.info("Last %d crawl runs:", len(runs))
     for run in runs:
-        print(
-            f"  {run.run_date} {run.status} "
-            f"success={run.success_count} fail={run.fail_count}"
+        logger.info(
+            "%s %s success=%d fail=%d",
+            run.run_date,
+            run.status,
+            run.success_count,
+            run.fail_count,
         )
 
     states = session.query(CrawlState).all()
     if states:
-        print("\nCrawl states:")
+        logger.info("Crawl states:")
         for s in states:
-            print(
-                f"  {s.mkt}: last_success={s.last_success_date} "
-                f"failures={s.consecutive_failures}"
+            logger.info(
+                "%s: last_success=%s failures=%s",
+                s.mkt,
+                s.last_success_date,
+                s.consecutive_failures,
             )
 
 

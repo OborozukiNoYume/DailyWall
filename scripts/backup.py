@@ -1,16 +1,23 @@
-import logging
 import sqlite3
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 from app.config import settings
+from app.logging_utils import configure_logging, get_component_logger
+
+logger = get_component_logger("maintenance", __name__)
+
+
+def setup_logging():
+    return configure_logging("maintenance", log_dir=settings.LOG_DIR)
 
 
 def backup_database():
+    setup_logging()
     db_path = Path(settings.DB_PATH).resolve()
     if not db_path.exists():
-        print(f"Database not found: {db_path}")
+        logger.error("Database not found: %s", db_path)
         sys.exit(1)
 
     backup_dir = db_path.parent / "backups"
@@ -25,14 +32,14 @@ def backup_database():
     target.close()
     source.close()
 
-    print(f"Backup created: {backup_path}")
+    logger.info("Backup created: %s", backup_path)
 
     # Rotate: keep last 30 backups
     backups = sorted(backup_dir.glob("dailywall_*.db"))
     if len(backups) > 30:
         for old in backups[:-30]:
             old.unlink()
-            print(f"Removed old backup: {old}")
+            logger.info("Removed old backup: %s", old)
 
 
 if __name__ == "__main__":

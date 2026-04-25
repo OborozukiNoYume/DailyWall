@@ -97,7 +97,8 @@ curl http://127.0.0.1:8000/api/health
 
 - `dailywall-api.service` 默认以 `ops` 用户运行，工作目录固定为项目根目录。
 - 启动命令使用项目虚拟环境中的 `python -m app.main`，会读取项目根目录下的 `.env`，并沿用 `API_HOST`、`API_PORT` 等配置。
-- API 日志默认写入 `journald`，可通过 `journalctl -u dailywall-api.service -n 50 --no-pager` 查看。
+- API 正式日志会写入 `logs/api.log`，同时标准输出仍会进入 `journald`，可通过 `journalctl -u dailywall-api.service -n 50 --no-pager` 查看。
+- 所有模块的错误日志还会额外汇总到 `logs/error.log`，便于集中排查失败任务。
 - 若 `.venv` 尚未创建或依赖未安装，服务会启动失败；先执行 `uv sync --dev`。
 
 ### 6. 配置定时采集
@@ -110,20 +111,21 @@ crontab -e
 
 ```cron
 33 0 * * * cd /path/to/DailyWall || exit 1; echo "[$(date --iso-8601=seconds)] cron crawl start" >> logs/cron.log 2>&1; .venv/bin/python scripts/crawl.py >> logs/cron.log 2>&1; code=$?; echo "[$(date --iso-8601=seconds)] cron crawl exit=$code" >> logs/cron.log 2>&1; exit $code
-30 2 * * * cd /path/to/DailyWall && .venv/bin/python scripts/backup.py >> logs/backup.log 2>&1
+30 2 * * * cd /path/to/DailyWall && .venv/bin/python scripts/backup.py >/dev/null 2>&1
 ```
 
 补充说明：
 
 - `cron` 按机器本地时区执行，不会自动换算北京时间或 UTC。部署后建议先运行 `timedatectl` 或 `date -Iseconds` 确认时区。
-- 该写法会把开始时间、抓取过程和退出码都追加到 `logs/cron.log`。
+- 抓取脚本的正式业务日志写入 `logs/crawl.log`，`cron.log` 只作为调度层辅助日志。
+- 备份和巡检脚本的正式日志写入 `logs/maintenance.log`；上面的备份 `cron` 示例采用静默重定向，避免重复生成额外日志文件。
 - 抓取脚本退出码约定：
   - `0`：完全成功
   - `2`：部分成功
   - `1`：失败或未成功执行
 - 验证定时任务是否成功时，建议同时检查：
-  - 日志中存在 `Crawl finished: status=success ...`
-  - 日志末尾存在 `cron crawl exit=0`
+  - `logs/crawl.log` 中存在 `Crawl finished: status=success ...`
+  - `logs/cron.log` 末尾存在 `cron crawl exit=0`
 
 ## 停止服务
 

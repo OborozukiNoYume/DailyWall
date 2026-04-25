@@ -1,44 +1,28 @@
-import logging
-import sys
-from logging.handlers import RotatingFileHandler
-from pathlib import Path
-
 from app.config import settings
 from app.database import init_db
+from app.logging_utils import configure_logging, get_component_logger
 from crawler.crawler import Crawler
+
+logger = get_component_logger("crawl", __name__)
 
 
 def setup_logging():
-    log_dir = settings.LOG_DIR
-    log_file = f"{log_dir}/crawl.log"
-    Path(log_dir).mkdir(parents=True, exist_ok=True)
-
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-
-    handler = RotatingFileHandler(
-        log_file, maxBytes=10 * 1024 * 1024, backupCount=5
-    )
-    handler.setFormatter(
-        logging.Formatter(
-            "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-        )
-    )
-    logger.addHandler(handler)
-
-    console = logging.StreamHandler(sys.stdout)
-    console.setFormatter(
-        logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
-    )
-    logger.addHandler(console)
+    return configure_logging("crawl", log_dir=settings.LOG_DIR)
 
 
 def main():
     setup_logging()
     settings.ensure_dirs()
     init_db()
+    logger.info("Starting crawl run for %d markets", len(settings.MARKETS))
     crawler = Crawler()
     result = crawler.run()
+    logger.info(
+        "Crawl script exit status=%s success=%d fail=%d",
+        result.status,
+        result.success_count,
+        result.fail_count,
+    )
 
     if result.status == "success":
         return 0

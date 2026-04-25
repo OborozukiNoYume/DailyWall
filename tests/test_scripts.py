@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from app import logging_utils
 from app.models import CrawlRun, CrawlState, Metadata, Resource
 from crawler.crawler import CrawlResult
 from scripts import backup as backup_script
@@ -38,7 +39,19 @@ def _insert_resource_with_metadata(db_session, tmp_path, sha):
     return resource
 
 
+def _clear_managed_handlers():
+    root_logger = logging.getLogger()
+    for handler in list(root_logger.handlers):
+        if getattr(handler, logging_utils._HANDLER_KEY_ATTR, None):
+            root_logger.removeHandler(handler)
+            handler.close()
+
+
 def test_backup_database_missing_db_exits(monkeypatch, tmp_path, capsys):
+    _clear_managed_handlers()
+    monkeypatch.setattr(
+        backup_script.settings, "LOG_DIR", str(tmp_path / "logs")
+    )
     monkeypatch.setattr(
         backup_script.settings,
         "DB_PATH",
@@ -53,6 +66,7 @@ def test_backup_database_missing_db_exits(monkeypatch, tmp_path, capsys):
 
 
 def test_backup_database_creates_backup_and_rotates(monkeypatch, tmp_path, capsys):
+    _clear_managed_handlers()
     db_path = tmp_path / "dailywall.db"
     conn = sqlite3.connect(db_path)
     conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY)")
@@ -65,6 +79,9 @@ def test_backup_database_creates_backup_and_rotates(monkeypatch, tmp_path, capsy
         (backup_dir / f"dailywall_20200101_0000{i:02d}.db").write_bytes(b"old")
 
     monkeypatch.setattr(backup_script.settings, "DB_PATH", str(db_path))
+    monkeypatch.setattr(
+        backup_script.settings, "LOG_DIR", str(tmp_path / "logs")
+    )
 
     backup_script.backup_database()
 
@@ -78,6 +95,10 @@ def test_backup_database_creates_backup_and_rotates(monkeypatch, tmp_path, capsy
 def test_daily_inspect_reports_invalid_files(
     db_session, monkeypatch, tmp_path, capsys
 ):
+    _clear_managed_handlers()
+    monkeypatch.setattr(
+        check_script.settings, "LOG_DIR", str(tmp_path / "logs")
+    )
     resource = _insert_resource_with_metadata(db_session, tmp_path, "a" * 64)
     Path(f"{resource.base_path}.jpg").write_bytes(b"original")
     Path(f"{resource.base_path}_thumbnail.jpg").write_bytes(b"")
@@ -97,6 +118,10 @@ def test_daily_inspect_reports_invalid_files(
 def test_weekly_inspect_reports_sha_mismatch(
     db_session, monkeypatch, tmp_path, capsys
 ):
+    _clear_managed_handlers()
+    monkeypatch.setattr(
+        check_script.settings, "LOG_DIR", str(tmp_path / "logs")
+    )
     resource = _insert_resource_with_metadata(db_session, tmp_path, "b" * 64)
     Path(f"{resource.base_path}.jpg").write_bytes(b"not-matching")
     Path(f"{resource.base_path}_thumbnail.jpg").write_bytes(b"thumb")
@@ -111,7 +136,11 @@ def test_weekly_inspect_reports_sha_mismatch(
     assert "SHA256 mismatches (1):" in output
 
 
-def test_show_status_prints_summary(db_session, tmp_path, capsys):
+def test_show_status_prints_summary(db_session, monkeypatch, tmp_path, capsys):
+    _clear_managed_handlers()
+    monkeypatch.setattr(
+        check_script.settings, "LOG_DIR", str(tmp_path / "logs")
+    )
     _insert_resource_with_metadata(db_session, tmp_path, "c" * 64)
     db_session.add(
         CrawlRun(
@@ -144,21 +173,36 @@ def test_show_status_prints_summary(db_session, tmp_path, capsys):
 
 
 def test_setup_logging_creates_handlers(monkeypatch, tmp_path):
-    logger = logging.Logger("dailywall-test")
+    _clear_managed_handlers()
     monkeypatch.setattr(crawl_script.settings, "LOG_DIR", str(tmp_path / "logs"))
-    monkeypatch.setattr(crawl_script.logging, "getLogger", lambda: logger)
 
     crawl_script.setup_logging()
 
     assert (tmp_path / "logs").exists()
-    assert len(logger.handlers) == 2
-    assert any(
-        isinstance(handler, crawl_script.RotatingFileHandler)
-        for handler in logger.handlers
-    )
+    handler_keys = {
+        getattr(handler, logging_utils._HANDLER_KEY_ATTR, None)
+        for handler in logging.getLogger().handlers
+    }
+    assert "crawl:file" in handler_keys
+    assert "shared:error" in handler_keys
+    assert "shared:console" in handler_keys
 
-    for handler in logger.handlers:
-        handler.close()
+
+def test_setup_logging_is_idempotent(monkeypatch, tmp_path):
+    _clear_managed_handlers()
+    monkeypatch.setattr(crawl_script.settings, "LOG_DIR", str(tmp_path / "logs"))
+
+    crawl_script.setup_logging()
+    crawl_script.setup_logging()
+
+    handler_keys = [
+        getattr(handler, logging_utils._HANDLER_KEY_ATTR, None)
+        for handler in logging.getLogger().handlers
+        if getattr(handler, logging_utils._HANDLER_KEY_ATTR, None)
+    ]
+    assert handler_keys.count("crawl:file") == 1
+    assert handler_keys.count("shared:error") == 1
+    assert handler_keys.count("shared:console") == 1
 
 
 @pytest.mark.parametrize(

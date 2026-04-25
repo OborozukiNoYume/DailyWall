@@ -6,7 +6,7 @@
 
 ```bash
 # 添加到 crontab，每日采集后执行（如凌晨 2:30）
-30 2 * * * cd /path/to/DailyWall && .venv/bin/python scripts/backup.py >> logs/backup.log 2>&1
+30 2 * * * cd /path/to/DailyWall && .venv/bin/python scripts/backup.py >/dev/null 2>&1
 ```
 
 备份文件存储在 `data/backups/` 目录，自动保留最近 30 天。
@@ -61,27 +61,25 @@ uv run python scripts/check.py weekly
 uv run python scripts/check.py status
 ```
 
-输出示例：
+输出示例（当前已接入统一日志，实际输出会包含时间、级别和 logger 名称）：
 
-```
-Resources: 19
-Metadata entries: 89
-
-Last 1 crawl runs:
-  2026-04-18 success success=89 fail=0
-
-Crawl states:
-  zh-CN: last_success=2026-04-18 failures=0
-  en-US: last_success=2026-04-18 failures=0
-  en-GB: last_success=2026-04-18 failures=0
-  en-IN: last_success=2026-04-18 failures=0
-  en-CA: last_success=2026-04-18 failures=0
-  ja-JP: last_success=2026-04-18 failures=0
-  de-DE: last_success=2026-04-18 failures=0
-  fr-FR: last_success=2026-04-18 failures=0
-  it-IT: last_success=2026-04-18 failures=0
-  es-ES: last_success=2026-04-18 failures=0
-  pt-BR: last_success=2026-04-18 failures=0
+```text
+2026-04-25 16:30:00,000 [INFO] dailywall.maintenance.scripts.check: Resources: 19
+2026-04-25 16:30:00,001 [INFO] dailywall.maintenance.scripts.check: Metadata entries: 89
+2026-04-25 16:30:00,001 [INFO] dailywall.maintenance.scripts.check: Last 1 crawl runs:
+2026-04-25 16:30:00,001 [INFO] dailywall.maintenance.scripts.check: 2026-04-18 success success=89 fail=0
+2026-04-25 16:30:00,001 [INFO] dailywall.maintenance.scripts.check: Crawl states:
+2026-04-25 16:30:00,001 [INFO] dailywall.maintenance.scripts.check: zh-CN: last_success=2026-04-18 failures=0
+2026-04-25 16:30:00,001 [INFO] dailywall.maintenance.scripts.check: en-US: last_success=2026-04-18 failures=0
+2026-04-25 16:30:00,001 [INFO] dailywall.maintenance.scripts.check: en-GB: last_success=2026-04-18 failures=0
+2026-04-25 16:30:00,001 [INFO] dailywall.maintenance.scripts.check: en-IN: last_success=2026-04-18 failures=0
+2026-04-25 16:30:00,001 [INFO] dailywall.maintenance.scripts.check: en-CA: last_success=2026-04-18 failures=0
+2026-04-25 16:30:00,001 [INFO] dailywall.maintenance.scripts.check: ja-JP: last_success=2026-04-18 failures=0
+2026-04-25 16:30:00,001 [INFO] dailywall.maintenance.scripts.check: de-DE: last_success=2026-04-18 failures=0
+2026-04-25 16:30:00,001 [INFO] dailywall.maintenance.scripts.check: fr-FR: last_success=2026-04-18 failures=0
+2026-04-25 16:30:00,001 [INFO] dailywall.maintenance.scripts.check: it-IT: last_success=2026-04-18 failures=0
+2026-04-25 16:30:00,001 [INFO] dailywall.maintenance.scripts.check: es-ES: last_success=2026-04-18 failures=0
+2026-04-25 16:30:00,001 [INFO] dailywall.maintenance.scripts.check: pt-BR: last_success=2026-04-18 failures=0
 ```
 
 ## 日志管理
@@ -90,9 +88,12 @@ Crawl states:
 
 ```
 logs/
-├── crawl.log          # 采集日志（自动轮转，10MB × 5 个备份）
-├── cron.log           # Cron 执行日志
-└── backup.log         # 备份日志
+├── api.log            # API 服务日志（自动轮转，10MB × 5 个备份）
+├── crawl.log          # 采集业务日志（自动轮转，10MB × 5 个备份）
+├── maintenance.log    # 备份/巡检脚本日志（自动轮转，10MB × 5 个备份）
+├── error.log          # 所有 ERROR 级别日志汇总
+├── cron.log           # Cron 调度辅助日志
+└── systemd-crawl.log  # systemd 抓取测试辅助日志
 ```
 
 ### Cron 抓取成功判定
@@ -106,7 +107,7 @@ logs/
 判断某次定时抓取是否成功时，建议检查 `logs/cron.log` 是否同时满足：
 
 - 出现 `cron crawl start`
-- 出现 `Crawl finished: status=success ...`
+- 对应时间段的 `logs/crawl.log` 中出现 `Crawl finished: status=success ...`
 - 出现 `cron crawl exit=0`
 
 退出码含义：
@@ -116,6 +117,12 @@ logs/
 - `1`：失败、跳过或脚本未成功执行
 
 如果只看到 `cron crawl start`，但没有对应的 `cron crawl exit=...`，通常表示任务异常中断，应继续检查同一时间段内的报错日志。
+
+### 业务日志与调度日志的关系
+
+- `crawl.log`、`api.log`、`maintenance.log` 是正式业务日志，优先用于排查功能问题。
+- `cron.log`、`systemd-crawl.log` 是调度层辅助日志，主要记录任务是否被触发、退出码是多少。
+- `error.log` 会额外汇总所有模块的错误日志，适合先快速定位失败事件，再回到对应模块日志查看上下文。
 
 ### systemd 72 小时测试
 
@@ -161,7 +168,7 @@ tail -n 50 logs/systemd-crawl.log
 
 ### API 访问日志
 
-如果使用前台方式启动，API 日志由 uvicorn 直接输出到终端。
+如果使用前台方式启动，API 日志会同时写入 `logs/api.log` 并输出到终端。
 
 如果使用 `systemd` 管理 API，推荐命令：
 
@@ -173,6 +180,12 @@ systemctl status dailywall-api.service --no-pager
 journalctl -u dailywall-api.service -n 50 --no-pager
 curl http://127.0.0.1:8000/api/health
 ```
+
+定位 API 问题时，建议优先查看：
+
+- `logs/api.log`
+- `logs/error.log`
+- `journalctl -u dailywall-api.service -n 50 --no-pager`
 
 健康检查返回 `code=200`、`data.status=healthy` 且 `data.db_ok=true` 时，可视为 API 服务和数据库连接正常。
 

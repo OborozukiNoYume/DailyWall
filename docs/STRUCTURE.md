@@ -48,7 +48,7 @@ PRAGMA 设置：`journal_mode=WAL`、`busy_timeout=3000`、`foreign_keys=ON`、`
 
 **唯一约束**：`UNIQUE(mkt, date)` — 同地区同日期仅一张壁纸。
 
-**多市场关系说明**：同一张壁纸图片（同一 `sha256`）可能被多个市场的 metadata 引用，但不同市场在同一天也可能展示完全不同的图片（不同 `sha256`）。`resources` 与 `metadata` 是多对多关系：一张图片可对应多条元数据，一条元数据指向一张图片。
+**多市场关系说明**：同一张壁纸图片（同一 `sha256`）可能被多个市场的 metadata 引用，但不同市场在同一天也可能展示完全不同的图片（不同 `sha256`）。在当前实现里，`resources` 与 `metadata` 的关系是“一对多”：一条 `resources` 记录可对应多条 `metadata`，每条 `metadata` 只指向一条 `resources` 记录。
 
 ### crawl_runs（采集运行记录表）
 
@@ -87,6 +87,26 @@ wallpaper/
 │       ├── {sha256}_thumbnail.jpg          # 缩略图（200px 宽，JPEG 质量 85）
 │       └── {sha256}_preview.jpg            # 预览图（≤1920px 宽，JPEG 质量 90）
 ```
+
+## 日志目录规范
+
+项目运行时会自动创建 `logs/` 目录，当前约定如下：
+
+```text
+logs/
+├── api.log            # API 服务日志
+├── crawl.log          # 采集业务日志
+├── maintenance.log    # 备份/巡检脚本日志
+├── error.log          # 所有 ERROR 级别日志汇总
+├── cron.log           # Cron 调度辅助日志
+└── systemd-crawl.log  # systemd 抓取测试辅助日志
+```
+
+补充说明：
+
+- `api.log`、`crawl.log`、`maintenance.log` 是正式业务日志
+- `error.log` 只额外汇总错误，不包含全部普通日志
+- `cron.log`、`systemd-crawl.log` 用于确认任务是否被触发、退出码是多少，不替代业务日志
 
 ## 路径拼接规则
 

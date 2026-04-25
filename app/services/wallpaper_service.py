@@ -2,7 +2,7 @@ import math
 from collections import defaultdict
 
 from fastapi import HTTPException
-from sqlalchemy import func, or_
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
 from app.models import Metadata, Resource
@@ -128,10 +128,15 @@ def _list_wallpapers_dedup(
             pages=0,
         )
 
+    display_date = func.coalesce(
+        func.min(case((Metadata.mkt == "zh-CN", Metadata.date), else_=None)),
+        func.min(Metadata.date),
+    )
+
     rows = (
         session.query(
             Resource.sha256.label("sha256"),
-            func.min(Metadata.date).label("date"),
+            display_date.label("date"),
             Resource.width.label("width"),
             Resource.height.label("height"),
             Resource.bytes.label("bytes"),
@@ -149,7 +154,7 @@ def _list_wallpapers_dedup(
             Resource.ext,
             Resource.mime_type,
         )
-        .order_by(func.min(Metadata.date).desc(), Resource.sha256.desc())
+        .order_by(display_date.desc(), Resource.sha256.desc())
         .offset((params.page - 1) * params.size)
         .limit(params.size)
         .all()

@@ -191,6 +191,30 @@ def test_dedup_groups_by_sha_and_uses_priority_metadata(db_session):
     assert result.items[0].copyright == "中文版权"
 
 
+def test_dedup_prefers_zh_cn_date_over_earlier_market_date(db_session):
+    sha = "b" * 64
+    _insert_wallpaper(
+        db_session,
+        1,
+        mkt="en-US",
+        sha=sha,
+        date="2026-04-23",
+    )
+    _insert_wallpaper(
+        db_session,
+        2,
+        mkt="zh-CN",
+        sha=sha,
+        date="2026-04-24",
+    )
+
+    params = WallpaperQueryParams(dedup=True)
+    result = wallpaper_service.list_wallpapers(db_session, params)
+
+    assert result.total == 1
+    assert result.items[0].date == "2026-04-24"
+
+
 def test_dedup_keyword_matches_any_metadata(db_session):
     sha = "d" * 64
     _insert_wallpaper(

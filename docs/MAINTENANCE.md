@@ -135,6 +135,7 @@ logs/
 配套执行脚本：
 
 - `scripts/run_crawl_job.sh`
+- `scripts/systemd_menu.sh`：中文交互式 systemd 分组管理菜单
 
 默认计划时间：
 
@@ -156,6 +157,12 @@ sudo install -D -m 0644 deploy/systemd/dailywall-crawl.service /etc/systemd/syst
 sudo install -D -m 0644 deploy/systemd/dailywall-crawl.timer /etc/systemd/system/dailywall-crawl.timer
 sudo systemctl daemon-reload
 sudo systemctl enable --now dailywall-crawl.timer
+```
+
+也可以使用交互式分组菜单执行安装、开机自启、启动停止、状态查看、日志查看、健康检查和手动触发一次爬取：
+
+```bash
+./scripts/systemd_menu.sh
 ```
 
 建议在启用 `systemd timer` 前停用同类 `cron` 抓取任务，避免重复执行影响测试结论。

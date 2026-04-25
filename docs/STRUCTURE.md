@@ -8,10 +8,15 @@ SQLite 数据库文件位于 `data/dailywall.db`，启用 WAL 模式。
 
 | 角色 | 连接方式 | 用途 |
 |------|----------|------|
-| API 服务 | 只读连接 `?mode=ro`，单例引擎 | 查询壁纸数据 |
+| API 服务 | 只读连接 `?mode=ro`，单例引擎 + `NullPool` | 查询壁纸数据 |
 | 爬虫/脚本 | 读写连接，每次新建引擎 | 采集写入、巡检 |
 
 PRAGMA 设置：`journal_mode=WAL`、`busy_timeout=3000`、`foreign_keys=ON`、`synchronous=NORMAL`
+
+补充说明：
+
+- API 侧保留单例 SQLAlchemy engine，但不复用线程绑定 SQLite 连接
+- API engine 使用 `NullPool`，每次会话按需建立只读连接，避免并发线程数升高时出现已关闭连接被复用的问题
 
 ### resources（资源主表）
 

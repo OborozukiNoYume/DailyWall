@@ -6,6 +6,7 @@ from sqlalchemy import event
 from sqlalchemy import text
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.config import settings
 from app.models import Base
@@ -39,6 +40,9 @@ def get_engine():
         _api_engine = create_engine(
             "sqlite://",
             creator=_connect_ro,
+            # The sqlite:// URL would otherwise select SingletonThreadPool,
+            # which may close active thread-bound connections under load.
+            poolclass=NullPool,
             pool_pre_ping=True,
         )
         event.listen(_api_engine, "connect", _set_pragmas)

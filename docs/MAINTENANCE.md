@@ -199,8 +199,28 @@ WHERE r.is_deleted = 1 AND m.sha256 IS NULL;
 ### 数据库锁定
 
 - API 使用只读连接（`mode=ro`），爬虫使用读写连接
+- API 读库 engine 使用 `NullPool`，避免并发请求下复用被关闭的 SQLite 线程连接
 - `busy_timeout=3000ms` 自动等待
 - 避免手动操作数据库时运行爬虫
+
+### API 并发访问后异常退出
+
+如果前台 `uvicorn` 日志中出现类似报错：
+
+```text
+sqlite3.ProgrammingError: Cannot operate on a closed database.
+```
+
+优先检查：
+
+- 当前代码是否仍使用 API 只读 engine + `NullPool`
+- 是否误改为 `SingletonThreadPool`、线程绑定连接复用，或其他会跨线程保留 SQLite 连接的实现
+- 是否在高并发压测或图片 `Range` 请求期间出现 `500` 后进程退出
+
+当前项目的预期实现是：
+
+- API：只读连接 `mode=ro` + `NullPool`
+- 爬虫/脚本：独立读写 engine
 
 ### 磁盘空间不足
 

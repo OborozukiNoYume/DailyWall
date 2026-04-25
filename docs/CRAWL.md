@@ -18,9 +18,10 @@
 
 ### 频率
 
-- **日常采集**：Cron 每日触发，通过 `scripts/crawl.py` 执行
+- **日常采集**：可通过 `systemd timer` 或 `cron` 定时触发，最终都通过 `scripts/crawl.py` 执行
 - **冷启动**：首次运行自动拉取最近 8 天数据（`idx=0, n=8`）
 - **重复执行策略**：当前实现每次都会请求最近 8 天数据，再依靠 `(mkt, date)` 和 `SHA256` 双重去重避免重复入库；`crawl_state` 当前仅用于记录状态，不参与断点续采
+- **默认 systemd 计划**：`deploy/systemd/dailywall-crawl.timer` 按各市场公开接口更新时间后 10 分钟设置多个触发点；每次触发仍会遍历全部 `MARKETS`
 
 ### 采集日志
 

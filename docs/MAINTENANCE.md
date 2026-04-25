@@ -93,7 +93,7 @@ logs/
 ├── maintenance.log    # 备份/巡检脚本日志（自动轮转，10MB × 5 个备份）
 ├── error.log          # 所有 ERROR 级别日志汇总
 ├── cron.log           # Cron 调度辅助日志
-└── systemd-crawl.log  # systemd 抓取测试辅助日志
+└── systemd-crawl.log  # systemd 调度辅助日志
 ```
 
 ### Cron 抓取成功判定
@@ -124,13 +124,13 @@ logs/
 - `cron.log`、`systemd-crawl.log` 是调度层辅助日志，主要记录任务是否被触发、退出码是多少。
 - `error.log` 会额外汇总所有模块的错误日志，适合先快速定位失败事件，再回到对应模块日志查看上下文。
 
-### systemd 72 小时测试
+### systemd 定时抓取
 
-项目提供了测试用单元文件：
+项目提供了定时抓取用单元文件：
 
 - `deploy/systemd/dailywall-api.service`
-- `deploy/systemd/dailywall-crawl-test.service`
-- `deploy/systemd/dailywall-crawl-test.timer`
+- `deploy/systemd/dailywall-crawl.service`
+- `deploy/systemd/dailywall-crawl.timer`
 
 配套执行脚本：
 
@@ -138,21 +138,29 @@ logs/
 
 默认计划时间：
 
-- 每天 `00:33`
-- 每天 `11:11`
+- 每天 `00:10`，对应 `zh-CN` 推算更新时间后 10 分钟
+- 每天 `02:40`，对应 `en-IN` 推算更新时间后 10 分钟
+- 每天 `06:10`，对应 `de-DE`、`fr-FR`、`it-IT`、`es-ES` 推算更新时间后 10 分钟
+- 每天 `07:10`，对应 `en-GB` 推算更新时间后 10 分钟
+- 每天 `11:10`，对应 `pt-BR` 推算更新时间后 10 分钟
+- 每天 `12:10`，对应 `en-CA` 推算更新时间后 10 分钟
+- 每天 `15:10`，对应 `en-US` 推算更新时间后 10 分钟
+- 每天 `23:10`，对应 `ja-JP` 推算更新时间后 10 分钟
+
+当前 `scripts/crawl.py` 每次运行都会遍历全部 `MARKETS`。多个触发点用于贴近各地区更新时间，已存在的元数据和文件会被去重逻辑跳过。
 
 安装并启动示例：
 
 ```bash
-sudo install -D -m 0644 deploy/systemd/dailywall-crawl-test.service /etc/systemd/system/dailywall-crawl-test.service
-sudo install -D -m 0644 deploy/systemd/dailywall-crawl-test.timer /etc/systemd/system/dailywall-crawl-test.timer
+sudo install -D -m 0644 deploy/systemd/dailywall-crawl.service /etc/systemd/system/dailywall-crawl.service
+sudo install -D -m 0644 deploy/systemd/dailywall-crawl.timer /etc/systemd/system/dailywall-crawl.timer
 sudo systemctl daemon-reload
-sudo systemctl enable --now dailywall-crawl-test.timer
+sudo systemctl enable --now dailywall-crawl.timer
 ```
 
 建议在启用 `systemd timer` 前停用同类 `cron` 抓取任务，避免重复执行影响测试结论。
 
-测试日志写入：
+调度日志写入：
 
 - `logs/systemd-crawl.log`
 
@@ -160,9 +168,9 @@ sudo systemctl enable --now dailywall-crawl-test.timer
 
 ```bash
 systemctl status dailywall-api.service
-systemctl list-timers dailywall-crawl-test.timer
-systemctl status dailywall-crawl-test.timer
-journalctl -u dailywall-crawl-test.service -n 50 --no-pager
+systemctl list-timers dailywall-crawl.timer
+systemctl status dailywall-crawl.timer
+journalctl -u dailywall-crawl.service -n 50 --no-pager
 tail -n 50 logs/systemd-crawl.log
 ```
 

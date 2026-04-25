@@ -1,5 +1,5 @@
 [Unit]
-Description=DailyWall API service
+Description=DailyWall FastAPI service
 Wants=network-online.target
 After=network-online.target
 
@@ -9,9 +9,11 @@ User=ops
 Group=ops
 WorkingDirectory=/home/ops/Projects/DailyWall
 Environment=PYTHONUNBUFFERED=1
+ExecStartPre=/usr/bin/test -x /home/ops/Projects/DailyWall/.venv/bin/python
 ExecStart=/home/ops/Projects/DailyWall/.venv/bin/python -m app.main
 Restart=on-failure
 RestartSec=5
+SyslogIdentifier=dailywall-api
 
 [Install]
 WantedBy=multi-user.target

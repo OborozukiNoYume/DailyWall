@@ -1,0 +1,15 @@
+[Unit]
+Description=DailyWall scheduled crawl job
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ops
+Group=ops
+WorkingDirectory=/home/ops/Projects/DailyWall
+ExecStartPre=/usr/bin/test -x /home/ops/Projects/DailyWall/.venv/bin/python
+ExecStartPre=/usr/bin/test -x /home/ops/Projects/DailyWall/scripts/run_crawl_job.sh
+ExecStart=/usr/bin/env bash /home/ops/Projects/DailyWall/scripts/run_crawl_job.sh systemd
+Nice=10
+SyslogIdentifier=dailywall-crawl

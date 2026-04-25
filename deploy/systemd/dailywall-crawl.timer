@@ -1,0 +1,18 @@
+[Unit]
+Description=Schedule DailyWall crawl job
+
+[Timer]
+Unit=dailywall-crawl.service
+OnCalendar=*-*-* 00:10:00
+OnCalendar=*-*-* 02:40:00
+OnCalendar=*-*-* 06:10:00
+OnCalendar=*-*-* 07:10:00
+OnCalendar=*-*-* 11:10:00
+OnCalendar=*-*-* 12:10:00
+OnCalendar=*-*-* 15:10:00
+OnCalendar=*-*-* 23:10:00
+Persistent=true
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

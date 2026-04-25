@@ -103,20 +103,41 @@ curl http://127.0.0.1:8000/api/health
 
 ### 6. 配置定时采集
 
+推荐使用项目自带的 `systemd timer` 管理定时采集：
+
+```bash
+sudo install -D -m 0644 deploy/systemd/dailywall-crawl.service /etc/systemd/system/dailywall-crawl.service
+sudo install -D -m 0644 deploy/systemd/dailywall-crawl.timer /etc/systemd/system/dailywall-crawl.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now dailywall-crawl.timer
+systemctl list-timers dailywall-crawl.timer
+```
+
+默认计划时间按 11 个 Bing 市场的公开接口更新时间推算，并在对应时间后 10 分钟触发：
+
+```text
+00:10, 02:40, 06:10, 07:10, 11:10, 12:10, 15:10, 23:10
+```
+
+当前 `scripts/crawl.py` 每次会遍历全部 `MARKETS`，重复数据依靠数据库唯一约束和 SHA256 去重跳过。
+
+如果更倾向使用 `cron`，也可以手动配置：
+
 ```bash
 crontab -e
 ```
 
-添加定时采集任务和备份（需替换为实际路径）。下例使用每天本地时间 `00:33` 抓取：
+添加定时采集任务和备份（需替换为实际路径）。下例使用每天本地时间 `00:10` 抓取一次：
 
 ```cron
-33 0 * * * cd /path/to/DailyWall || exit 1; echo "[$(date --iso-8601=seconds)] cron crawl start" >> logs/cron.log 2>&1; .venv/bin/python scripts/crawl.py >> logs/cron.log 2>&1; code=$?; echo "[$(date --iso-8601=seconds)] cron crawl exit=$code" >> logs/cron.log 2>&1; exit $code
+10 0 * * * cd /path/to/DailyWall || exit 1; echo "[$(date --iso-8601=seconds)] cron crawl start" >> logs/cron.log 2>&1; .venv/bin/python scripts/crawl.py >> logs/cron.log 2>&1; code=$?; echo "[$(date --iso-8601=seconds)] cron crawl exit=$code" >> logs/cron.log 2>&1; exit $code
 30 2 * * * cd /path/to/DailyWall && .venv/bin/python scripts/backup.py >/dev/null 2>&1
 ```
 
 补充说明：
 
 - `cron` 按机器本地时区执行，不会自动换算北京时间或 UTC。部署后建议先运行 `timedatectl` 或 `date -Iseconds` 确认时区。
+- 不要同时启用 `cron` 和 `systemd timer` 的同类抓取任务，避免重复调度干扰日志判断。
 - 抓取脚本的正式业务日志写入 `logs/crawl.log`，`cron.log` 只作为调度层辅助日志。
 - 备份和巡检脚本的正式日志写入 `logs/maintenance.log`；上面的备份 `cron` 示例采用静默重定向，避免重复生成额外日志文件。
 - 抓取脚本退出码约定：

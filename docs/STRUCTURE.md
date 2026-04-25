@@ -99,7 +99,7 @@ logs/
 ├── maintenance.log    # 备份/巡检脚本日志
 ├── error.log          # 所有 ERROR 级别日志汇总
 ├── cron.log           # Cron 调度辅助日志
-└── systemd-crawl.log  # systemd 抓取测试辅助日志
+└── systemd-crawl.log  # systemd 调度辅助日志
 ```
 
 补充说明：

@@ -166,7 +166,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now dailywall-crawl.timer
 ```
 
-也可以使用交互式分组菜单执行安装、开机自启、启动停止、状态查看、日志查看、健康检查和手动触发一次爬取：
+也可以使用交互式分组菜单执行安装、开机自启、启动停止、状态查看、日志查看、健康检查和手动爬取。手动爬取菜单支持按当前 systemd 时间窗口运行、全量采集、模拟指定时间点采集和指定地区采集：
 
 ```bash
 ./scripts/systemd_menu.sh

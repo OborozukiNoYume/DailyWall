@@ -5,6 +5,7 @@ set -u
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SYSTEMD_DIR="${ROOT_DIR}/deploy/systemd"
 SYSTEMD_TARGET_DIR="/etc/systemd/system"
+PYTHON_BIN="${ROOT_DIR}/.venv/bin/python"
 
 API_UNIT="dailywall-api.service"
 CRAWL_SERVICE_UNIT="dailywall-crawl.service"
@@ -108,10 +109,64 @@ stop_timer() {
   "${SUDO[@]}" systemctl stop "${CRAWL_TIMER_UNIT}"
 }
 
-run_crawl_once() {
-  printf "正在通过 %s 手动触发一次爬取...\n" "${CRAWL_SERVICE_UNIT}"
+require_python_bin() {
+  if [[ ! -x "${PYTHON_BIN}" ]]; then
+    printf "错误: 未找到可执行 Python: %s\n" "${PYTHON_BIN}" >&2
+    printf "请先在项目目录执行: uv sync --dev\n" >&2
+    return 1
+  fi
+}
+
+run_crawl_with_args() {
+  require_python_bin || return 1
+  cd "${ROOT_DIR}" || return 1
+  "${PYTHON_BIN}" "${ROOT_DIR}/scripts/crawl.py" "$@"
+}
+
+run_crawl_scheduled_now() {
+  printf "正在通过 %s 按当前定时窗口触发爬取...\n" "${CRAWL_SERVICE_UNIT}"
+  printf "注意: 如果当前时间不在配置窗口内，本次运行会失败。\n"
   "${SUDO[@]}" systemctl start "${CRAWL_SERVICE_UNIT}" || return 1
   systemctl status "${CRAWL_SERVICE_UNIT}" --no-pager
+}
+
+run_crawl_all_markets() {
+  printf "正在手动采集全部 MARKETS...\n"
+  run_crawl_with_args
+}
+
+run_crawl_simulated_time() {
+  local schedule_time
+
+  printf "可用时间点: 00:10, 02:40, 06:10, 07:10, 11:10, 12:10, 15:10, 23:10\n"
+  printf "请输入要模拟的时间点(HH:MM): "
+  read -r schedule_time
+
+  if [[ -z "${schedule_time}" ]]; then
+    printf "已取消。\n"
+    return 0
+  fi
+
+  printf "正在模拟 %s 时间点采集对应地区...\n" "${schedule_time}"
+  run_crawl_with_args --scheduled-markets --schedule-time "${schedule_time}"
+}
+
+run_crawl_selected_markets() {
+  local markets_text
+  local market_args=()
+
+  printf "请输入地区编码，支持空格或逗号分隔，例如: zh-CN en-US 或 zh-CN,en-US\n"
+  printf "地区: "
+  read -r markets_text
+
+  if [[ -z "${markets_text}" ]]; then
+    printf "已取消。\n"
+    return 0
+  fi
+
+  read -r -a market_args <<< "${markets_text}"
+  printf "正在采集指定地区: %s\n" "${markets_text}"
+  run_crawl_with_args --markets "${market_args[@]}"
 }
 
 show_status() {
@@ -400,20 +455,26 @@ crawl_menu() {
   while true; do
     print_header
     printf "手动爬取\n"
-    printf "1) 立即运行一次 crawl\n"
-    printf "2) 查看 crawl service 状态\n"
-    printf "3) 查看最近 crawl service 日志\n"
-    printf "4) 查看本地 systemd-crawl.log\n"
+    printf "1) 通过 systemd 按当前定时窗口运行\n"
+    printf "2) 手动采集全部 MARKETS\n"
+    printf "3) 手动模拟定时时间点采集\n"
+    printf "4) 手动采集指定地区\n"
+    printf "5) 查看 crawl service 状态\n"
+    printf "6) 查看最近 crawl service 日志\n"
+    printf "7) 查看本地 systemd-crawl.log\n"
     printf "0) 返回主菜单\n"
     printf "\n请选择: "
     read -r choice
 
     printf "\n"
     case "${choice}" in
-      1) run_and_pause run_crawl_once ;;
-      2) run_and_pause crawl_status ;;
-      3) run_and_pause journalctl -u "${CRAWL_SERVICE_UNIT}" -n 100 --no-pager ;;
-      4) run_and_pause tail_file "${ROOT_DIR}/logs/systemd-crawl.log" ;;
+      1) run_and_pause run_crawl_scheduled_now ;;
+      2) run_and_pause run_crawl_all_markets ;;
+      3) run_and_pause run_crawl_simulated_time ;;
+      4) run_and_pause run_crawl_selected_markets ;;
+      5) run_and_pause crawl_status ;;
+      6) run_and_pause journalctl -u "${CRAWL_SERVICE_UNIT}" -n 100 --no-pager ;;
+      7) run_and_pause tail_file "${ROOT_DIR}/logs/systemd-crawl.log" ;;
       0) return 0 ;;
       *) printf "无效选项。\n"; pause ;;
     esac

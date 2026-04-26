@@ -1,6 +1,7 @@
 import fcntl
 import os
 import tempfile
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,6 +17,9 @@ from crawler.bing_fetcher import create_http_client, fetch_images, get_uhd_url
 from crawler.downloader import download_and_process
 
 logger = get_component_logger("crawl", __name__)
+
+FETCH_IMAGE_RETRIES = 3
+FETCH_IMAGE_RETRY_DELAY_SECONDS = 1.0
 
 
 @dataclass(frozen=True)
@@ -108,9 +112,14 @@ class Crawler:
         had_success = False
 
         try:
-            images = fetch_images(mkt, idx=0, n=8)
+            images = self._fetch_images_with_retries(mkt)
         except Exception as e:
-            logger.error("Failed to fetch images for %s: %s", mkt, e)
+            logger.error(
+                "Skipping %s after %d failed fetch attempts: %s",
+                mkt,
+                FETCH_IMAGE_RETRIES + 1,
+                e,
+            )
             self._update_crawl_state(session, mkt, False)
             return 0, 1
 
@@ -128,6 +137,25 @@ class Crawler:
 
         self._update_crawl_state(session, mkt, had_success)
         return success_count, fail_count
+
+    def _fetch_images_with_retries(self, mkt: str) -> list[dict]:
+        attempts = FETCH_IMAGE_RETRIES + 1
+        for attempt in range(1, attempts + 1):
+            try:
+                return fetch_images(mkt, idx=0, n=8)
+            except Exception as e:
+                if attempt >= attempts:
+                    raise
+                logger.warning(
+                    "Fetch images failed for %s on attempt %d/%d; retrying: %s",
+                    mkt,
+                    attempt,
+                    attempts,
+                    e,
+                )
+                time.sleep(FETCH_IMAGE_RETRY_DELAY_SECONDS)
+
+        raise RuntimeError(f"Failed to fetch images for {mkt}")
 
     def _process_image(
         self, session: Session, mkt: str, img_data: dict

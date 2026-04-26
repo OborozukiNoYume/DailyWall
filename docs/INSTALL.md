@@ -121,6 +121,8 @@ systemctl list-timers dailywall-crawl.timer
 
 当前 `scripts/crawl.py` 每次会遍历全部 `MARKETS`，重复数据依靠数据库唯一约束和 SHA256 去重跳过。
 
+抓取某个市场元数据失败时，重试逻辑在 Python 应用内部执行：首次请求失败后再重试 3 次，全部失败才将该市场计入失败。因此无需为该重试功能修改 `dailywall-crawl.service` 或 `dailywall-crawl.timer`。
+
 如果更倾向使用 `cron`，也可以手动配置：
 
 ```bash

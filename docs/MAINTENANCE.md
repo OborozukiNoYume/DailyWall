@@ -123,6 +123,7 @@ logs/
 - `crawl.log`、`api.log`、`maintenance.log` 是正式业务日志，优先用于排查功能问题。
 - `cron.log`、`systemd-crawl.log` 是调度层辅助日志，主要记录任务是否被触发、退出码是多少。
 - `error.log` 会额外汇总所有模块的错误日志，适合先快速定位失败事件，再回到对应模块日志查看上下文。
+- 采集某个市场的元数据失败时，会先在应用层重试 3 次。重试过程记录为 `WARNING`；只有首次请求和 3 次重试全部失败后，才记录 `Skipping {mkt} after 4 failed fetch attempts` 并计入本轮失败。
 
 ### systemd 定时抓取
 
@@ -260,6 +261,8 @@ sqlite3.ProgrammingError: Cannot operate on a closed database.
 
 - 检查 `crawl_runs` 表最近记录的 `message` 字段
 - 检查 `logs/cron.log` 是否为 `cron crawl exit=2` 或 `cron crawl exit=1`
+- 如果看到 `Fetch images failed for {mkt} ... retrying`，表示正在重试，尚未最终跳过该市场
+- 如果看到 `Skipping {mkt} after 4 failed fetch attempts`，表示该市场本轮已重试耗尽并被计为失败
 - 检查网络连接
 - 检查 `crawl_state` 表 `consecutive_failures` 字段
 - 手动执行 `uv run python scripts/crawl.py` 观察日志输出

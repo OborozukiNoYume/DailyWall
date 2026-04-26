@@ -119,6 +119,48 @@ def test_level2_dedup(db_session):
     assert new_meta.copyrightlink == BING_RESPONSE[0]["copyrightlink"]
 
 
+def test_fetch_images_retries_before_processing_market(db_session):
+    crawler = Crawler.__new__(Crawler)
+
+    with patch(
+        "crawler.crawler.fetch_images",
+        side_effect=[
+            RuntimeError("temporary ssl"),
+            RuntimeError("still failing"),
+            BING_RESPONSE,
+        ],
+    ) as fetch_mock:
+        with patch("crawler.crawler.time.sleep") as sleep_mock:
+            with patch.object(crawler, "_process_image", return_value=True):
+                success, fail = crawler._crawl_market(db_session, "fr-FR")
+
+    assert success == 1
+    assert fail == 0
+    assert fetch_mock.call_count == 3
+    assert sleep_mock.call_count == 2
+
+
+def test_fetch_images_skips_market_after_retry_exhaustion(db_session):
+    crawler = Crawler.__new__(Crawler)
+
+    with patch(
+        "crawler.crawler.fetch_images",
+        side_effect=RuntimeError("ssl down"),
+    ) as fetch_mock:
+        with patch("crawler.crawler.time.sleep") as sleep_mock:
+            success, fail = crawler._crawl_market(db_session, "fr-FR")
+
+    assert success == 0
+    assert fail == 1
+    assert fetch_mock.call_count == 4
+    assert sleep_mock.call_count == 3
+
+    state = db_session.query(CrawlState).filter_by(mkt="fr-FR").first()
+    assert state is not None
+    assert state.consecutive_failures == 1
+    assert state.last_success_date is None
+
+
 def test_init_db_adds_metadata_copyrightlink_column(monkeypatch, tmp_path):
     import sqlite3
 

@@ -28,8 +28,8 @@
 - `scripts/crawl.py` 会自动初始化统一日志配置，正式业务日志写入 `logs/crawl.log`
 - 采集过程按 `INFO / WARNING / ERROR` 分层：
   - `INFO`：开始、结束、去重命中、新增资源、汇总统计
-  - `WARNING`：跳过、字段缺失、无法构造下载地址、重复任务
-  - `ERROR`：请求失败、处理失败、运行异常
+  - `WARNING`：临时请求失败后准备重试、字段缺失、无法构造下载地址、重复任务
+  - `ERROR`：重试耗尽后的请求失败、处理失败、运行异常
 - 所有采集链路中的错误还会额外汇总到 `logs/error.log`
 - 如果通过 `cron` 或 `systemd` 触发任务，`logs/cron.log`、`logs/systemd-crawl.log` 只用于记录调度开始和退出码，不替代 `crawl.log`
 
@@ -38,7 +38,7 @@
 1. 获取文件锁（`fcntl.flock`，非阻塞排他锁）
 2. 初始化数据库（`init_db()`，幂等）
 3. 依次处理每个地区：
-   a. 调用 Bing API 获取最近 8 天壁纸元数据
+   a. 调用 Bing API 获取最近 8 天壁纸元数据；若失败，会在应用层重试 3 次
    b. 对每张壁纸执行 `_process_image`
    c. 更新 `crawl_state` 表
 4. 汇总结果写入 `crawl_runs` 表
@@ -107,7 +107,7 @@ https://www.bing.com/HPImageArchive.aspx?format=js&uhd=1&idx={offset}&n={count}&
 
 - **文件锁**：使用 `fcntl.flock(LOCK_EX|LOCK_NB)` 防止并发采集，获取锁失败时跳过本次运行
 - **代理支持**：通过 `PROXY_URL` 环境变量配置 HTTP 代理，用于突破 Bing IP 地理限制获取多语言元数据。留空则直连。
-- **HTTP 重试**：httpx HTTPTransport retries=3
+- **HTTP 重试**：底层 `httpx.HTTPTransport` 配置 `retries=3`；应用层获取某个市场元数据失败时，还会额外重试 3 次。只有首次请求和 3 次重试全部失败后，才记录 `Skipping {mkt} after 4 failed fetch attempts` 并将该市场计为失败。
 - **请求超时**：元数据请求 30s，图片下载 60s
 - **数据校验**：下载后 PIL verify 校验图片完整性，无效文件不入库
 - **状态持久化**：`crawl_state` 表记录各地区采集状态，重启后不丢失

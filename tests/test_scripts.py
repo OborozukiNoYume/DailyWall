@@ -1,5 +1,6 @@
 import logging
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -221,9 +222,115 @@ def test_crawl_main_returns_expected_code(
     monkeypatch.setattr(crawl_script, "init_db", lambda: None)
 
     class DummyCrawler:
+        def __init__(self, markets):
+            self.markets = markets
+
         def run(self):
             return CrawlResult(status, 1, 0)
 
     monkeypatch.setattr(crawl_script, "Crawler", DummyCrawler)
 
     assert crawl_script.main() == expected_code
+
+
+def test_select_scheduled_markets_returns_matching_group():
+    markets = crawl_script.select_scheduled_markets(
+        datetime(2026, 4, 26, 6, 15),
+        window_minutes=30,
+    )
+
+    assert markets == ["de-DE", "fr-FR", "it-IT", "es-ES"]
+
+
+def test_crawl_main_uses_explicit_markets(monkeypatch):
+    monkeypatch.setattr(crawl_script, "setup_logging", lambda: None)
+    monkeypatch.setattr(
+        crawl_script.settings.__class__,
+        "ensure_dirs",
+        lambda self: None,
+    )
+    monkeypatch.setattr(crawl_script, "init_db", lambda: None)
+
+    captured = {}
+
+    class DummyCrawler:
+        def __init__(self, markets):
+            captured["markets"] = markets
+
+        def run(self):
+            return CrawlResult("success", 2, 0)
+
+    monkeypatch.setattr(crawl_script, "Crawler", DummyCrawler)
+
+    assert crawl_script.main(["--markets", "zh-CN,en-US"]) == 0
+    assert captured["markets"] == ["zh-CN", "en-US"]
+
+
+def test_crawl_main_uses_scheduled_markets(monkeypatch):
+    monkeypatch.setattr(crawl_script, "setup_logging", lambda: None)
+    monkeypatch.setattr(
+        crawl_script.settings.__class__,
+        "ensure_dirs",
+        lambda self: None,
+    )
+    monkeypatch.setattr(crawl_script, "init_db", lambda: None)
+    monkeypatch.setattr(
+        crawl_script,
+        "select_scheduled_markets",
+        lambda now=None, window_minutes=30: ["pt-BR"],
+    )
+
+    captured = {}
+
+    class DummyCrawler:
+        def __init__(self, markets):
+            captured["markets"] = markets
+
+        def run(self):
+            return CrawlResult("success", 1, 0)
+
+    monkeypatch.setattr(crawl_script, "Crawler", DummyCrawler)
+
+    assert crawl_script.main(["--scheduled-markets"]) == 0
+    assert captured["markets"] == ["pt-BR"]
+
+
+def test_crawl_main_simulates_scheduled_time(monkeypatch):
+    monkeypatch.setattr(crawl_script, "setup_logging", lambda: None)
+    monkeypatch.setattr(
+        crawl_script.settings.__class__,
+        "ensure_dirs",
+        lambda self: None,
+    )
+    monkeypatch.setattr(crawl_script, "init_db", lambda: None)
+
+    captured = {}
+
+    class DummyCrawler:
+        def __init__(self, markets):
+            captured["markets"] = markets
+
+        def run(self):
+            return CrawlResult("success", 4, 0)
+
+    monkeypatch.setattr(crawl_script, "Crawler", DummyCrawler)
+
+    assert (
+        crawl_script.main(
+            ["--scheduled-markets", "--schedule-time", "06:10"]
+        )
+        == 0
+    )
+    assert captured["markets"] == ["de-DE", "fr-FR", "it-IT", "es-ES"]
+
+
+def test_schedule_time_requires_scheduled_markets(monkeypatch):
+    monkeypatch.setattr(crawl_script, "setup_logging", lambda: None)
+    monkeypatch.setattr(
+        crawl_script.settings.__class__,
+        "ensure_dirs",
+        lambda self: None,
+    )
+    monkeypatch.setattr(crawl_script, "init_db", lambda: None)
+
+    assert crawl_script.main(["--schedule-time", "06:10"]) == 1

@@ -98,10 +98,10 @@ logs/
 
 ### Cron 抓取成功判定
 
-推荐使用带开始标记和退出码的 `crontab` 写法：
+推荐使用带开始标记和退出码的 `crontab` 写法。若使用 `cron` 模拟 systemd 分组采集，需要为每个时间点传入对应的 `--schedule-time`：
 
 ```cron
-33 0 * * * cd /path/to/DailyWall || exit 1; echo "[$(date --iso-8601=seconds)] cron crawl start" >> logs/cron.log 2>&1; .venv/bin/python scripts/crawl.py >> logs/cron.log 2>&1; code=$?; echo "[$(date --iso-8601=seconds)] cron crawl exit=$code" >> logs/cron.log 2>&1; exit $code
+10 0 * * * cd /path/to/DailyWall || exit 1; echo "[$(date --iso-8601=seconds)] cron crawl 00:10 start" >> logs/cron.log 2>&1; .venv/bin/python scripts/crawl.py --scheduled-markets --schedule-time 00:10 >> logs/cron.log 2>&1; code=$?; echo "[$(date --iso-8601=seconds)] cron crawl 00:10 exit=$code" >> logs/cron.log 2>&1; exit $code
 ```
 
 判断某次定时抓取是否成功时，建议检查 `logs/cron.log` 是否同时满足：
@@ -149,7 +149,13 @@ logs/
 - 每天 `15:10`，对应 `en-US` 推算更新时间后 10 分钟
 - 每天 `23:10`，对应 `ja-JP` 推算更新时间后 10 分钟
 
-当前 `scripts/crawl.py` 每次运行都会遍历全部 `MARKETS`。多个触发点用于贴近各地区更新时间，已存在的元数据和文件会被去重逻辑跳过。
+systemd 定时任务通过 `--scheduled-markets` 只采集当前时间点对应的地区。
+
+手动执行 `uv run python scripts/crawl.py` 默认会遍历全部 `MARKETS`，已存在的元数据和文件会被去重逻辑跳过。如需手动模拟某个定时时间点，可执行：
+
+```bash
+uv run python scripts/crawl.py --scheduled-markets --schedule-time 06:10
+```
 
 安装并启动示例：
 

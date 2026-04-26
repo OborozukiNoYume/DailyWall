@@ -119,7 +119,13 @@ systemctl list-timers dailywall-crawl.timer
 00:10, 02:40, 06:10, 07:10, 11:10, 12:10, 15:10, 23:10
 ```
 
-当前 `scripts/crawl.py` 每次会遍历全部 `MARKETS`，重复数据依靠数据库唯一约束和 SHA256 去重跳过。
+systemd 定时任务会通过 `--scheduled-markets` 只采集当前时间点对应的地区，例如 `00:10` 采集 `zh-CN`，`06:10` 采集 `de-DE`、`fr-FR`、`it-IT`、`es-ES`。
+
+手动执行 `uv run python scripts/crawl.py` 默认会遍历全部 `MARKETS`，重复数据依靠数据库唯一约束和 SHA256 去重跳过。如需手动模拟某个定时时间点，可执行：
+
+```bash
+uv run python scripts/crawl.py --scheduled-markets --schedule-time 06:10
+```
 
 抓取某个市场元数据失败时，重试逻辑在 Python 应用内部执行：首次请求失败后再重试 3 次，全部失败才将该市场计入失败。因此无需为该重试功能修改 `dailywall-crawl.service` 或 `dailywall-crawl.timer`。
 
@@ -129,10 +135,17 @@ systemctl list-timers dailywall-crawl.timer
 crontab -e
 ```
 
-添加定时采集任务和备份（需替换为实际路径）。下例使用每天本地时间 `00:10` 抓取一次：
+添加定时采集任务和备份（需替换为实际路径）。如果使用 `cron` 模拟 systemd 分组采集，需要为每个时间点传入对应的 `--schedule-time`。示例：
 
 ```cron
-10 0 * * * cd /path/to/DailyWall || exit 1; echo "[$(date --iso-8601=seconds)] cron crawl start" >> logs/cron.log 2>&1; .venv/bin/python scripts/crawl.py >> logs/cron.log 2>&1; code=$?; echo "[$(date --iso-8601=seconds)] cron crawl exit=$code" >> logs/cron.log 2>&1; exit $code
+10 0 * * * cd /path/to/DailyWall || exit 1; echo "[$(date --iso-8601=seconds)] cron crawl 00:10 start" >> logs/cron.log 2>&1; .venv/bin/python scripts/crawl.py --scheduled-markets --schedule-time 00:10 >> logs/cron.log 2>&1; code=$?; echo "[$(date --iso-8601=seconds)] cron crawl 00:10 exit=$code" >> logs/cron.log 2>&1; exit $code
+40 2 * * * cd /path/to/DailyWall || exit 1; echo "[$(date --iso-8601=seconds)] cron crawl 02:40 start" >> logs/cron.log 2>&1; .venv/bin/python scripts/crawl.py --scheduled-markets --schedule-time 02:40 >> logs/cron.log 2>&1; code=$?; echo "[$(date --iso-8601=seconds)] cron crawl 02:40 exit=$code" >> logs/cron.log 2>&1; exit $code
+10 6 * * * cd /path/to/DailyWall || exit 1; echo "[$(date --iso-8601=seconds)] cron crawl 06:10 start" >> logs/cron.log 2>&1; .venv/bin/python scripts/crawl.py --scheduled-markets --schedule-time 06:10 >> logs/cron.log 2>&1; code=$?; echo "[$(date --iso-8601=seconds)] cron crawl 06:10 exit=$code" >> logs/cron.log 2>&1; exit $code
+10 7 * * * cd /path/to/DailyWall || exit 1; echo "[$(date --iso-8601=seconds)] cron crawl 07:10 start" >> logs/cron.log 2>&1; .venv/bin/python scripts/crawl.py --scheduled-markets --schedule-time 07:10 >> logs/cron.log 2>&1; code=$?; echo "[$(date --iso-8601=seconds)] cron crawl 07:10 exit=$code" >> logs/cron.log 2>&1; exit $code
+10 11 * * * cd /path/to/DailyWall || exit 1; echo "[$(date --iso-8601=seconds)] cron crawl 11:10 start" >> logs/cron.log 2>&1; .venv/bin/python scripts/crawl.py --scheduled-markets --schedule-time 11:10 >> logs/cron.log 2>&1; code=$?; echo "[$(date --iso-8601=seconds)] cron crawl 11:10 exit=$code" >> logs/cron.log 2>&1; exit $code
+10 12 * * * cd /path/to/DailyWall || exit 1; echo "[$(date --iso-8601=seconds)] cron crawl 12:10 start" >> logs/cron.log 2>&1; .venv/bin/python scripts/crawl.py --scheduled-markets --schedule-time 12:10 >> logs/cron.log 2>&1; code=$?; echo "[$(date --iso-8601=seconds)] cron crawl 12:10 exit=$code" >> logs/cron.log 2>&1; exit $code
+10 15 * * * cd /path/to/DailyWall || exit 1; echo "[$(date --iso-8601=seconds)] cron crawl 15:10 start" >> logs/cron.log 2>&1; .venv/bin/python scripts/crawl.py --scheduled-markets --schedule-time 15:10 >> logs/cron.log 2>&1; code=$?; echo "[$(date --iso-8601=seconds)] cron crawl 15:10 exit=$code" >> logs/cron.log 2>&1; exit $code
+10 23 * * * cd /path/to/DailyWall || exit 1; echo "[$(date --iso-8601=seconds)] cron crawl 23:10 start" >> logs/cron.log 2>&1; .venv/bin/python scripts/crawl.py --scheduled-markets --schedule-time 23:10 >> logs/cron.log 2>&1; code=$?; echo "[$(date --iso-8601=seconds)] cron crawl 23:10 exit=$code" >> logs/cron.log 2>&1; exit $code
 30 2 * * * cd /path/to/DailyWall && .venv/bin/python scripts/backup.py >/dev/null 2>&1
 ```
 

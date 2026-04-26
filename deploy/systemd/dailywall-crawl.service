@@ -10,6 +10,6 @@ Group=ops
 WorkingDirectory=/home/ops/Projects/DailyWall
 ExecStartPre=/usr/bin/test -x /home/ops/Projects/DailyWall/.venv/bin/python
 ExecStartPre=/usr/bin/test -x /home/ops/Projects/DailyWall/scripts/run_crawl_job.sh
-ExecStart=/usr/bin/env bash /home/ops/Projects/DailyWall/scripts/run_crawl_job.sh systemd
+ExecStart=/usr/bin/env bash /home/ops/Projects/DailyWall/scripts/run_crawl_job.sh systemd --scheduled-markets
 Nice=10
 SyslogIdentifier=dailywall-crawl

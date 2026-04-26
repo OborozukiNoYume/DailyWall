@@ -350,6 +350,9 @@ def test_script_main_returns_nonzero_for_partial(monkeypatch):
     monkeypatch.setattr(crawl_script, "init_db", lambda: None)
 
     class DummyCrawler:
+        def __init__(self, markets):
+            self.markets = markets
+
         def run(self):
             return CrawlResult("partial", 87, 1)
 

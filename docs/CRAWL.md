@@ -20,8 +20,23 @@
 
 - **日常采集**：可通过 `systemd timer` 或 `cron` 定时触发，最终都通过 `scripts/crawl.py` 执行
 - **冷启动**：首次运行自动拉取最近 8 天数据（`idx=0, n=8`）
-- **重复执行策略**：当前实现每次都会请求最近 8 天数据，再依靠 `(mkt, date)` 和 `SHA256` 双重去重避免重复入库；`crawl_state` 当前仅用于记录状态，不参与断点续采
-- **默认 systemd 计划**：`deploy/systemd/dailywall-crawl.timer` 按各市场公开接口更新时间后 10 分钟设置多个触发点；每次触发仍会遍历全部 `MARKETS`
+- **重复执行策略**：每个被选中的地区都会请求最近 8 天数据，再依靠 `(mkt, date)` 和 `SHA256` 双重去重避免重复入库；`crawl_state` 当前仅用于记录状态，不参与断点续采
+- **默认 systemd 计划**：`deploy/systemd/dailywall-crawl.timer` 按各市场公开接口更新时间后 10 分钟设置多个触发点；systemd 触发时通过 `--scheduled-markets` 只采集当前时间点对应的地区
+
+默认 systemd 时间点与地区对应关系：
+
+| 采集时间 | 地区 |
+|------|------|
+| `00:10` | `zh-CN` |
+| `02:40` | `en-IN` |
+| `06:10` | `de-DE`、`fr-FR`、`it-IT`、`es-ES` |
+| `07:10` | `en-GB` |
+| `11:10` | `pt-BR` |
+| `12:10` | `en-CA` |
+| `15:10` | `en-US` |
+| `23:10` | `ja-JP` |
+
+手动执行 `uv run python scripts/crawl.py` 默认采集全部 `MARKETS`。如需采集指定地区，可使用 `--markets zh-CN en-US`。如需模拟某个 systemd 时间点，可使用 `--scheduled-markets --schedule-time 06:10`。
 
 ### 采集日志
 
@@ -37,7 +52,7 @@
 
 1. 获取文件锁（`fcntl.flock`，非阻塞排他锁）
 2. 初始化数据库（`init_db()`，幂等）
-3. 依次处理每个地区：
+3. 依次处理本次选中的地区：
    a. 调用 Bing API 获取最近 8 天壁纸元数据；若失败，会在应用层重试 3 次
    b. 对每张壁纸执行 `_process_image`
    c. 更新 `crawl_state` 表
@@ -127,6 +142,19 @@ https://www.bing.com/HPImageArchive.aspx?format=js&uhd=1&idx={offset}&n={count}&
 
 ```bash
 uv run python scripts/crawl.py
+```
+
+常用手动模式：
+
+```bash
+# 采集全部 MARKETS
+uv run python scripts/crawl.py
+
+# 只采集指定地区
+uv run python scripts/crawl.py --markets zh-CN en-US
+
+# 模拟 systemd 的 06:10 时间点，采集 de-DE/fr-FR/it-IT/es-ES
+uv run python scripts/crawl.py --scheduled-markets --schedule-time 06:10
 ```
 
 脚本会自动初始化数据库，并创建运行所需目录：

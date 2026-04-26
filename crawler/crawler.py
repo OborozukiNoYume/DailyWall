@@ -30,9 +30,10 @@ class CrawlResult:
 
 
 class Crawler:
-    def __init__(self):
+    def __init__(self, markets: list[str] | None = None):
         self.engine = get_crawler_engine()
         self.lock_path = Path(settings.DB_PATH).parent / ".crawl.lock"
+        self.markets = markets if markets is not None else settings.MARKETS
 
     def run(self) -> CrawlResult:
         now = datetime.now(timezone.utc)
@@ -59,7 +60,7 @@ class Crawler:
         message_parts = []
 
         try:
-            for mkt in settings.MARKETS:
+            for mkt in getattr(self, "markets", settings.MARKETS):
                 try:
                     s, f = self._crawl_market(session, mkt)
                     total_success += s
